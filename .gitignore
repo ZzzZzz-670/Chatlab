@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+!.env.local.example
+.venv/
+node_modules/
+.next/
+.data/
+__pycache__/
+*.pyc
+tsconfig.tsbuildinfo
