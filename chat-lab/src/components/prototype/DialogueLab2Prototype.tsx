@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildApiHeaders, buildApiUrl } from "@/lib/api-client";
-import { judgeMemoryCandidates, routeAgent } from "@/lib/agent-router";
 
 type AppView =
   | "chat"
@@ -225,6 +224,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
   const [selectedPrefs, setSelectedPrefs] = useState(["多解释一点", "建议具体一点"]);
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hasConfirmedProfile, setHasConfirmedProfile] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendDebug, setSendDebug] = useState<string | null>(null);
 
   useEffect(() => {
     setView(initialView);
@@ -298,18 +299,35 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
 
   const sendMock = useCallback((overrideText?: string) => {
     const text = (overrideText ?? input).trim();
-    if (!text) return;
+    if (!text) {
+      showToast("先输入一点内容");
+      return;
+    }
+    const requestId = Date.now();
+    const setStage = (stage: string, detail?: unknown) => {
+      const label = `[chat:${requestId}] ${stage}`;
+      setSendDebug(stage);
+      console.log(label, detail ?? "");
+    };
+
     setMessages((prev) => [...prev, { id: `user_${Date.now()}`, type: "user", content: text }]);
     setInput("");
-
-    const routeHint = routeAgent(text, hasConfirmedProfile);
-    const memoryCandidates = judgeMemoryCandidates(text);
+    setIsSending(true);
+    setSendDebug("准备发送");
 
     void (async () => {
+      let timeoutId: number | undefined;
       try {
-        const response = await fetch(buildApiUrl("/api/v1/chat"), {
+        setStage("已触发发送", { text });
+        const controller = new AbortController();
+        timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
+        setStage("开始请求 /api/v1/chat");
+        const response = await window.fetch("/api/v1/chat", {
           method: "POST",
           headers: buildApiHeaders(),
+          cache: "no-store",
+          signal: controller.signal,
           body: JSON.stringify({
             family_id: "family_demo",
             child_id: "child_demo",
@@ -322,11 +340,10 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
             client_context: {
               entry_mode: "daily_chat",
               page: "chat",
-              route_hint: routeHint,
-              memory_candidates: memoryCandidates,
             },
           }),
         });
+        setStage(`收到响应 ${response.status}`);
         const data = (await response.json()) as {
           reply?: { message_type?: string; content?: string };
           memory_note?: string | null;
@@ -334,6 +351,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           memory_write_results?: { promoted_count?: number };
           error?: string;
         };
+        setStage("响应解析完成");
         if (!response.ok || data.error) throw new Error(data.error ?? "chat failed");
         if ((data.memory_write_results?.promoted_count ?? 0) > 0 || data.memory_note === "已更新孩子小档案") {
           setHasConfirmedProfile(true);
@@ -345,17 +363,27 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           memoryNote: data.memory_note ?? undefined,
           memoryDetail: data.memory_detail ?? undefined,
         });
+        setStage("发送完成");
       } catch (error) {
-        console.error("chat error:", error);
+        const message = error instanceof DOMException && error.name === "AbortError"
+          ? "请求超时，请确认 Next 终端是否收到 POST"
+          : error instanceof Error
+            ? error.message
+            : "未知错误";
+        setSendDebug(`发送失败：${message}`);
+        console.error(`[chat:${requestId}] error`, error);
         insertMessage({
           id: "reply",
           type: "normal_reply",
           content: "刚才这条没有连上后端。我先接住这件事：它值得放到孩子最近的状态里继续看，尤其是发生在开始前，还是已经做了一段以后。",
         });
         showToast("对话服务暂时不可用");
+      } finally {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+        setIsSending(false);
       }
-    });
-  }, [hasConfirmedProfile, input, insertMessage, showToast]);
+    })();
+  }, [input, insertMessage, showToast]);
 
   const generateLink = useCallback(() => {
     setGeneratedLink("https://demo.yihe.site/child-card/abc123");
@@ -427,6 +455,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     return (
       <ChatPage
         messages={messages}
+        isSending={isSending}
+        sendDebug={sendDebug}
         input={input}
         setInput={setInput}
         placeholder={placeholder}
@@ -450,6 +480,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     generateLink,
     generatedLink,
     input,
+    isSending,
+    sendDebug,
     messages,
     navigate,
     placeholder,
@@ -503,6 +535,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
 
 function ChatPage({
   messages,
+  isSending,
+  sendDebug,
   input,
   setInput,
   placeholder,
@@ -519,6 +553,8 @@ function ChatPage({
   sendMock,
 }: {
   messages: PrototypeMessage[];
+  isSending: boolean;
+  sendDebug: string | null;
   input: string;
   setInput: (value: string) => void;
   placeholder: string;
@@ -532,12 +568,22 @@ function ChatPage({
   copyText: (text: string, toastText?: string) => void;
   showToast: (text: string) => void;
   setMiniNote: (detail: string) => void;
-  sendMock: () => void;
+  sendMock: (overrideText?: string) => void;
 }) {
+  const scrollRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const scrollEl = scrollRef.current;
+      if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isSending, messages.length]);
+
   return (
     <div className="dl2-phone">
       <TopBar title="对话实验室" subtitle="记录孩子的变化，慢慢看懂孩子。" navigate={navigate} />
-      <main className="dl2-chat-scroll">
+      <main className="dl2-chat-scroll" ref={scrollRef}>
         {messages.map((message) => (
           <MessageRenderer
             key={message.id}
@@ -551,7 +597,17 @@ function ChatPage({
             setMiniNote={setMiniNote}
           />
         ))}
+        {isSending && (
+          <div className="dl2-message ai">
+            <div className="dl2-ai-bubble">
+              <TextBlock text="正在发送..." />
+            </div>
+          </div>
+        )}
       </main>
+      {process.env.NODE_ENV !== "production" && sendDebug && (
+        <div className="dl2-debug-line" aria-live="polite">调试：{sendDebug}</div>
+      )}
       <ChatInput
         value={input}
         setValue={setInput}
@@ -735,6 +791,21 @@ function ChatInput({
     finishVoice();
   }, [clearPressTimer, finishVoice]);
 
+  const handleSend = useCallback(() => {
+    const text = value.trim();
+    if (!text) {
+      showToast("先输入一点内容");
+      return;
+    }
+    onSend(text);
+  }, [onSend, showToast, value]);
+
+  const handleTextKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    handleSend();
+  }, [handleSend]);
+
   useEffect(() => {
     return () => {
       clearPressTimer();
@@ -760,10 +831,7 @@ function ChatInput({
             if (placeholder === "补充一点具体情况") return;
             setPlaceholder("从孩子最近的一件小事说起");
           }}
-          onPointerDown={beginLongPress}
-          onPointerUp={endLongPress}
-          onPointerCancel={endLongPress}
-          onPointerLeave={endLongPress}
+          onKeyDown={handleTextKeyDown}
         />
       ) : (
         <button
@@ -791,7 +859,7 @@ function ChatInput({
       >
         {inputMode === "text" ? <MicIcon /> : <KeyboardIcon />}
       </button>
-      <button className={cn("dl2-send-btn", Boolean(value.trim()))} type="button" onClick={() => onSend()} aria-label="发送">↑</button>
+      <button className={cn("dl2-send-btn", Boolean(value.trim()))} type="button" onClick={handleSend} aria-label="发送">↑</button>
     </footer>
   );
 }

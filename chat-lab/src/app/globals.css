@@ -214,6 +214,21 @@
     display: none;
   }
 
+  .dl2-debug-line {
+    position: fixed;
+    left: 50%;
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 39;
+    width: min(430px, 100vw);
+    padding: 5px 14px;
+    border-top: 1px solid #E5EAF2;
+    background: rgba(255,255,255,0.9);
+    color: #526070;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
   .dl2-message {
     margin-bottom: 16px;
     animation: msgIn 0.22s ease both;
