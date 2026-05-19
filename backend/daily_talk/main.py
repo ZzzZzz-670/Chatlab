@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import requests
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -196,6 +196,16 @@ class ChatRequest(BaseModel):
 async def lifespan(app: FastAPI):
     logger.info("Daily Talk backend starting on port %s", BACKEND_PORT)
     logger.info("Coze URL: %s", COZE_STREAM_RUN_URL)
+    # ASR 模型启动时预加载
+    try:
+        from local_asr import LocalASR
+        ok = LocalASR.preload()
+        if ok:
+            logger.info("[startup] ASR model preloaded and ready.")
+        else:
+            logger.warning("[startup] ASR model preload failed, will retry on first request.")
+    except Exception as e:
+        logger.warning("[startup] ASR preload skipped: %s", e)
     yield
     logger.info("Daily Talk backend shutting down")
 
@@ -335,6 +345,35 @@ async def stream_run(req: ChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── 本地 ASR（faster-whisper，不依赖外部 API）──
+try:
+    from local_asr import LocalASR
+    LOCAL_ASR_AVAILABLE = True
+except ImportError:
+    LOCAL_ASR_AVAILABLE = False
+
+
+@app.post("/api/asr")
+async def http_asr(request: Request):
+    """语音转文本接口 — 优先本地 faster-whisper。"""
+    payload = await request.json()
+    base64_data = payload.get("base64_data") or payload.get("base64Data")
+    mime_type = payload.get("mime_type") or payload.get("mimeType")
+
+    if not base64_data:
+        raise HTTPException(status_code=400, detail="base64_data is required")
+
+    if LOCAL_ASR_AVAILABLE:
+        try:
+            text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
+            return {"status": "success", "text": text}
+        except Exception as e:
+            logger.error("Local ASR failed: %s", e)
+            raise HTTPException(status_code=500, detail=f"ASR failed: {e}")
+
+    raise HTTPException(status_code=501, detail="Local ASR not available")
 
 
 # ── 健康检查 ──

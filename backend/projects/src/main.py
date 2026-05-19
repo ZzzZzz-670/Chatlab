@@ -1147,6 +1147,14 @@ except ImportError:
     AUDIO_SDK_AVAILABLE = False
     logger.warning("coze-coding-dev-sdk not available, audio features disabled")
 
+# 本地 ASR（faster-whisper）— 不依赖外部 API
+try:
+    from local_asr import LocalASR
+    LOCAL_ASR_AVAILABLE = True
+except ImportError:
+    LOCAL_ASR_AVAILABLE = False
+    logger.warning("local_asr not available, local ASR disabled")
+
 
 @app.post("/api/tts")
 async def http_tts(request: Request):
@@ -1182,33 +1190,38 @@ async def http_tts(request: Request):
 
 @app.post("/api/asr")
 async def http_asr(request: Request):
-    """语音转文本接口"""
+    """语音转文本接口 — 优先本地 faster-whisper，fallback 到 coze ASR。"""
+    payload = await request.json()
+    base64_data = payload.get("base64_data") or payload.get("base64Data")
+    url = payload.get("url")
+    mime_type = payload.get("mime_type") or payload.get("mimeType")
+
+    if not url and not base64_data:
+        raise HTTPException(status_code=400, detail="Either url or base64_data is required")
+
+    # 1. 优先使用本地 ASR（纯本地，不连外网）
+    if LOCAL_ASR_AVAILABLE and base64_data:
+        try:
+            text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
+            return {"status": "success", "text": text}
+        except Exception as e:
+            logger.warning(f"Local ASR failed: {e}, fallback to coze ASR")
+            # fallback 到 coze ASR（如果可用）
+
+    # 2. Fallback 到 coze ASR
     if not AUDIO_SDK_AVAILABLE:
-        raise HTTPException(status_code=501, detail="Audio SDK not available")
-    
+        raise HTTPException(status_code=501, detail="Audio SDK not available and local ASR failed")
+
     ctx = new_context(method="asr", headers=request.headers)
     request_context.set(ctx)
-    
     try:
-        payload = await request.json()
-        url = payload.get("url")
-        base64_data = payload.get("base64_data")
-        
-        if not url and not base64_data:
-            raise HTTPException(status_code=400, detail="Either url or base64_data is required")
-        
         client = ASRClient(ctx=ctx)
         text, data = client.recognize(
             uid="dialogue_lab_user",
             url=url,
             base64_data=base64_data
         )
-        
-        return {
-            "status": "success",
-            "text": text,
-            "data": data
-        }
+        return {"status": "success", "text": text, "data": data}
     except Exception as e:
         logger.error(f"ASR error: {e}, traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
