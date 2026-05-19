@@ -104,6 +104,58 @@ export function extractKeyQuestionTags(text: string): { text: string; keyQuestio
   };
 }
 
+export function highlightQuestion(text: string): string {
+  if (!text.trim() || text.includes("highlight-question")) return text;
+
+  const questionPrefixes = [
+    "想跟您确认下",
+    "想确认一下",
+    "想请教一下",
+    "想问问",
+    "想问",
+    "请问",
+    "想了解一下",
+    "能不能告诉我",
+    "可以问一下",
+    "问一下",
+    "能不能说说",
+    "能不能分享",
+    "能不能描述",
+    "能不能具体",
+    "能不能",
+  ];
+
+  const lastQuestionMark = Math.max(text.lastIndexOf("?"), text.lastIndexOf("？"));
+  if (lastQuestionMark === -1) return text;
+
+  // 从最后一个问号往前，找最靠后的提问开头词
+  let startIndex = -1;
+  for (const prefix of questionPrefixes) {
+    const idx = text.lastIndexOf(prefix, lastQuestionMark);
+    if (idx !== -1 && idx > startIndex) {
+      startIndex = idx;
+    }
+  }
+
+  // 没找到提问开头词时，找最后一个问号之前的句子边界
+  if (startIndex === -1) {
+    const beforeQuestion = text.slice(0, lastQuestionMark);
+    const enders = /[。！；.!;]/g;
+    let lastEnder = -1;
+    let match;
+    while ((match = enders.exec(beforeQuestion)) !== null) {
+      lastEnder = match.index;
+    }
+    startIndex = lastEnder !== -1 ? lastEnder + 1 : 0;
+  }
+
+  const questionPart = text.slice(startIndex, lastQuestionMark + 1);
+  const before = text.slice(0, startIndex);
+  const after = text.slice(lastQuestionMark + 1);
+
+  return before + '<span class="highlight-question">' + questionPart + "</span>" + after;
+}
+
 function normalizeCardSection(value: unknown): FrontendCardSection | undefined {
   if (!value) return undefined;
   if (typeof value === "string") return { title: "", content: cleanVisibleText(value) };

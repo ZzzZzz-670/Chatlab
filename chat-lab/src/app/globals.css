@@ -320,6 +320,17 @@
     font-size: 14px;
   }
 
+  .qhb-status-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px;
+    color: #526070;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
   .dl2-text-block {
     color: #374151;
     font-size: 17px;
@@ -411,6 +422,20 @@
   .dl2-key-question-inline {
     max-width: 100%;
     margin-top: 12px;
+  }
+
+  .highlight-question {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 0 10px 10px 0;
+    background: #E0F2FE;
+    padding: 4px 12px 4px 10px;
+    color: #1D4ED8;
+    font-size: 17px;
+    line-height: 1.82;
+    margin: 2px 0;
+    border-left: 3px solid #2563EB;
   }
 
   .dl2-card::before {

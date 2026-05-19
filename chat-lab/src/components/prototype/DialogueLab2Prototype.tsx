@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildApiHeaders, buildApiUrl } from "@/lib/api-client";
-import { cleanVisibleText } from "@/lib/agent-response";
+import { cleanVisibleText, extractKeyQuestionTags, highlightQuestion } from "@/lib/agent-response";
 import type { FrontendCard, FrontendCardSection } from "@/lib/agent-response";
 import Sidebar from "@/components/Sidebar";
 
@@ -35,7 +35,6 @@ interface PrototypeMessage {
   id: string;
   type: MessageType;
   content?: string;
-  keyQuestion?: string;
   memoryNote?: string;
   memoryDetail?: string;
   card?: FrontendCard;
@@ -482,8 +481,9 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           }
         }
 
-        // 清理文本中的内部标记和 markdown 噪声
-        const cleanedText = cleanVisibleText(accumulatedText);
+        // 移除 <key_question> 标签（让提问内容保留在正文中），再清理内部标记
+        const { text: textWithoutKeyQuestion } = extractKeyQuestionTags(accumulatedText);
+        const cleanedText = cleanVisibleText(textWithoutKeyQuestion);
 
         // 提取 markdown 诊断块（**字段名**：内容）
         const diagFields = [
@@ -537,21 +537,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           return prev;
         });
 
-        // 从 agent_meta 中提取 key_question，追加到当前 AI 消息末尾
-        const keyQuestion =
-          (typeof agentMeta?.key_question_content === "string" ? agentMeta.key_question_content : "") ||
-          (typeof agentMeta?.key_question === "string" ? agentMeta.key_question : "");
-        if (keyQuestion) {
-          setMessages((prev) => {
-            const idx = prev.findIndex((m) => m.id === aiMessageId);
-            if (idx >= 0) {
-              const updated = [...prev];
-              updated[idx] = { ...updated[idx], keyQuestion };
-              return updated;
-            }
-            return prev;
-          });
-        }
+        // 不再单独提取 key_question：提问语句保留在正文中，由 highlightQuestion 在渲染时高亮
 
         // 从 agent_meta 中提取诊断卡 / 前端卡片
         const metaCards = agentMeta?.frontend_cards ?? agentMeta?.frontendCards ?? agentMeta?.cards ?? agentMeta?.diagnosis_card;
@@ -798,6 +784,18 @@ function ChatPage({
   setSidebarOpen: (value: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLElement | null>(null);
+  const [qhbCount, setQhbCount] = useState(1);
+
+  useEffect(() => {
+    if (!showQhbStatus) {
+      setQhbCount(1);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setQhbCount((prev) => prev + 1);
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [showQhbStatus]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -825,14 +823,6 @@ function ChatPage({
             setMiniNote={setMiniNote}
           />
         ))}
-        {showQhbStatus && (
-          <div className="dl2-message ai">
-            <div className="qhb-status-bar">
-              <span className="qhb-status-icon">🔍</span>
-              <span className="qhb-status-text">正在查询清北学生资料...</span>
-            </div>
-          </div>
-        )}
         {isSending && (
           messages[messages.length - 1]?.type === "user" ||
           (messages[messages.length - 1]?.type === "normal_reply" && !messages[messages.length - 1]?.content)
@@ -843,6 +833,12 @@ function ChatPage({
               <i />
               <i />
             </div>
+          </div>
+        )}
+        {showQhbStatus && (
+          <div className="qhb-status-bottom">
+            <span className="qhb-status-icon">🔍</span>
+            <span className="qhb-status-text">正在查询清北学生资料，已查询 {qhbCount} 位</span>
           </div>
         )}
       </main>
@@ -1129,15 +1125,6 @@ function MessageRenderer(props: {
       <div className="dl2-ai-bubble">
         <TextBlock text={message.content ?? ""} />
         <MessageTools text={message.content ?? ""} copyText={props.copyText} openMenu={props.openMessageMenu} />
-        {message.keyQuestion && (
-          <article className="dl2-key-question dl2-key-question-inline">
-            <div className="dl2-capsule">关键追问</div>
-            <p>{message.keyQuestion}</p>
-            <div className="dl2-card-actions quiet">
-              <button type="button" onClick={() => props.copyText(message.keyQuestion!, "已复制关键追问")}>复制</button>
-            </div>
-          </article>
-        )}
       </div>
       {message.memoryNote && (
         <button className="dl2-memory-note" type="button" onClick={() => props.setMiniNote(message.memoryDetail ?? message.memoryNote ?? "")}>
@@ -1163,11 +1150,20 @@ function KeyQuestionMessage({ message, copyText }: Parameters<typeof MessageRend
   );
 }
 
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function TextBlock({ text }: { text: string }) {
   return (
     <div className="dl2-text-block">
       {text.split("\n").map((line, idx) => (
-        <p key={idx}>{line}</p>
+        <p key={idx} dangerouslySetInnerHTML={{ __html: highlightQuestion(escapeHtml(line)) }} />
       ))}
     </div>
   );
