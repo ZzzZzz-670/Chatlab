@@ -1,3 +1,4 @@
-您先别着急，孩子不想写作业不一定是态度问题，背后可能有好几种不同的原因，咱们先把具体情况摸清楚。我先问您一个最关键的：他是所有科目的作业都不想写，还是某一科、某一类任务（比如作文、计算、订正）特别抵触？
+您别太焦虑啦，不想写作业背后其实有很多具体原因，咱们先搞清楚细节才好对应调整。我想问您一下：他是所有科目的作业都不愿意碰，还是只有某一类任务比如作文、背诵、订正的时候抵触特别明显呀？
 <AGENT_META>
-{"output_type": "key_question", "key_question_content": "他是所有科目的作业都不想写，还是某一科、某一类任务（比如作文、计算、订正）特别抵触？
+{"output_type": "key_question", "key_question_content": "他是所有科目的作业都不愿意碰，还是只有某一类任务比如作文、背诵、订正的时候抵触特别明显？", "diagnosis_completed": false, "diagnosis_card": null, "handoff_summary": null, "profile_update_candidates": [], "pending_observations": []}
+</AGENT_META>

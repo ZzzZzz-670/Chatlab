@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { buildApiHeaders, buildApiUrl } from "@/lib/api-client";
 import { cleanVisibleText } from "@/lib/agent-response";
 import type { FrontendCard, FrontendCardSection } from "@/lib/agent-response";
+import Sidebar from "@/components/Sidebar";
 
 type AppView =
   | "chat"
@@ -269,6 +270,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hasConfirmedProfile, setHasConfirmedProfile] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setView(initialView);
@@ -289,6 +291,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
 
   const navigate = useCallback((next: AppView) => {
     setView(next);
+    setSidebarOpen(false);
     window.history.pushState({}, "", routeByView[next]);
   }, []);
 
@@ -673,6 +676,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         showToast={showToast}
         setMiniNote={setMiniNote}
         sendMock={sendMock}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
       />
     );
   }, [
@@ -692,6 +697,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     selectedPrefs,
     sendMock,
     showToast,
+    sidebarOpen,
+    setSidebarOpen,
     view,
   ]);
 
@@ -751,6 +758,8 @@ function ChatPage({
   showToast,
   setMiniNote,
   sendMock,
+  sidebarOpen,
+  setSidebarOpen,
 }: {
   messages: PrototypeMessage[];
   isSending: boolean;
@@ -768,6 +777,8 @@ function ChatPage({
   showToast: (text: string) => void;
   setMiniNote: (detail: string) => void;
   sendMock: (overrideText?: string) => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (value: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLElement | null>(null);
 
@@ -781,7 +792,8 @@ function ChatPage({
 
   return (
     <div className="dl2-phone">
-      <TopBar title="对话实验室" subtitle="记录孩子的变化，慢慢看懂孩子。" navigate={navigate} />
+      <TopBar title="对话实验室" subtitle="记录孩子的变化，慢慢看懂孩子。" navigate={navigate} onOpenSidebar={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNavigate={(v) => navigate(v as AppView)} />
       <main className="dl2-chat-scroll" ref={scrollRef}>
         {messages.map((message) => (
           <MessageRenderer
@@ -824,10 +836,10 @@ function ChatPage({
   );
 }
 
-function TopBar({ title, subtitle, navigate, backTo }: { title: string; subtitle?: string; navigate: (view: AppView) => void; backTo?: AppView }) {
+function TopBar({ title, subtitle, navigate, backTo, onOpenSidebar }: { title: string; subtitle?: string; navigate: (view: AppView) => void; backTo?: AppView; onOpenSidebar?: () => void }) {
   return (
     <header className="dl2-topbar">
-      <button className="dl2-icon-btn" type="button" onClick={() => (backTo ? navigate(backTo) : navigate("records"))} aria-label={backTo ? "返回" : "观察记录"}>
+      <button className="dl2-icon-btn" type="button" onClick={() => (backTo ? navigate(backTo) : onOpenSidebar ? onOpenSidebar() : navigate("records"))} aria-label={backTo ? "返回" : "菜单"}>
         {backTo ? "‹" : "≡"}
       </button>
       <div className="dl2-topbar-copy">
@@ -1655,13 +1667,6 @@ function SettingsPage({
           <SettingChoice title="提醒类型" options={["观察变化", "预演反馈", "周小观察"]} showToast={showToast} />
           <SettingChoice title="提醒时间" options={["晚上", "周末", "自定义"]} showToast={showToast} />
           <div className="dl2-reminder-preview">上次说到孩子对“完成后能不能真的休息”比较敏感。这两天如果有类似情况，可以回来简单记一句。</div>
-        </section>
-        <section className="dl2-settings-card">
-          <h2>产品演示</h2>
-          <p>这里单独保留一组预设对话，用来查看卡片和小档案效果。</p>
-          <div className="dl2-page-actions stacked">
-            <button type="button" onClick={() => navigate("demo")}>查看预设演示</button>
-          </div>
         </section>
         <section className="dl2-settings-card">
           <h2>数据与隐私</h2>
