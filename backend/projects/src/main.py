@@ -70,6 +70,11 @@ def _filter_text(text: str) -> Tuple[str, bool]:
     # 剥离内部诊断 JSON（<!--DIAGNOSIS_JSON {...}--> 或 ```diagnosis_json...```）
     f = re.sub(r'<!--DIAGNOSIS_JSON\s*\{[\s\S]*?\}\s*-->', '', f)
     f = re.sub(r'```diagnosis_json\s*\n[\s\S]*?\n```', '', f)
+    # 剥离前端不应展示的结构化内部字段
+    f = re.sub(r'```(?:json|meta|metadata|debug)\s*\n[\s\S]*?\n```', '', f, flags=re.IGNORECASE)
+    f = re.sub(r'<\s*(meta|metadata|output_type|outputType|internal|debug|json)\b[^>]*>[\s\S]*?</\s*\1\s*>', '', f, flags=re.IGNORECASE)
+    f = re.sub(r'(?im)^\s*(?:JSON|Meta|metadata|output_type|outputType|debug_id|trace_id|_meta|raw_agent_output)\s*[:=].*$', '', f)
+    f = re.sub(r'(?im)^\s*"(?:output_type|outputType|metadata|meta|debug_id|trace_id)"\s*:\s*.*[,]?$', '', f)
 
     # ---- 以下规则与 _filter_chunk 完全一致 ----
     # 过滤后台分析/推理过程
@@ -737,7 +742,9 @@ class GraphService:
         with self._graph_lock:
             if self._graph is not None:
                 return self._graph
-            self._graph = graph_helper.get_graph_instance("graphs.graph")
+            # self._graph = graph_helper.get_graph_instance("graphs.graph")
+            from agents.agent import build_agent
+            self._graph = build_agent(ctx)
             return self._graph
 
     @staticmethod
