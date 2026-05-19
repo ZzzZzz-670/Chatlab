@@ -35,6 +35,7 @@ interface PrototypeMessage {
   id: string;
   type: MessageType;
   content?: string;
+  keyQuestion?: string;
   memoryNote?: string;
   memoryDetail?: string;
   card?: FrontendCard;
@@ -270,6 +271,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hasConfirmedProfile, setHasConfirmedProfile] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showQhbStatus, setShowQhbStatus] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -358,6 +360,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     setMessages((prev) => [...prev, { id: `user_${Date.now()}`, type: "user", content: text }]);
     setInput("");
     setIsSending(true);
+    setShowQhbStatus(true);
 
     void (async () => {
       try {
@@ -397,6 +400,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         let agentMeta: Record<string, unknown> | null = null;
         let buffer = "";
         let currentEvent = "message";
+        let hasReceivedFirstChunk = false;
 
         // 先插入一个空的 AI 消息占位
         setMessages((prev) => [...prev, { id: aiMessageId, type: "normal_reply", content: "" }]);
@@ -440,6 +444,10 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
               const parsed = JSON.parse(dataStr);
               if (parsed.type === "answer") {
                 const chunk = parsed.content?.answer || "";
+                if (!hasReceivedFirstChunk && chunk.trim()) {
+                  hasReceivedFirstChunk = true;
+                  setShowQhbStatus(false);
+                }
                 accumulatedText += chunk;
                 // 打字机效果：更新同一条消息
                 setMessages((prev) => {
@@ -529,15 +537,19 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           return prev;
         });
 
-        // 从 agent_meta 中提取 key_question
+        // 从 agent_meta 中提取 key_question，追加到当前 AI 消息末尾
         const keyQuestion =
           (typeof agentMeta?.key_question_content === "string" ? agentMeta.key_question_content : "") ||
           (typeof agentMeta?.key_question === "string" ? agentMeta.key_question : "");
         if (keyQuestion) {
-          insertMessage({
-            id: "key_question",
-            type: "key_question",
-            content: keyQuestion,
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === aiMessageId);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], keyQuestion };
+              return updated;
+            }
+            return prev;
           });
         }
 
@@ -577,12 +589,13 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         showToast("对话服务暂时不可用");
       } finally {
         setIsSending(false);
+        setShowQhbStatus(false);
       }
     })();
   }, [input, insertMessage, questionnaireStatus, showToast, selectedPrefs]);
 
   const generateLink = useCallback(() => {
-    setGeneratedLink("https://demo.yihe.site/child-card/abc123");
+    setGeneratedLink("https://wj.qq.com/s2/26734354/idnz/");
     setQuestionnaireStatus("link_created");
     showToast("已生成填写链接");
   }, [showToast]);
@@ -662,6 +675,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
       <ChatPage
         messages={messages}
         isSending={isSending}
+        showQhbStatus={showQhbStatus}
         input={input}
         setInput={setInput}
         placeholder={placeholder}
@@ -696,6 +710,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     reminderEnabled,
     selectedPrefs,
     sendMock,
+    showQhbStatus,
     showToast,
     sidebarOpen,
     setSidebarOpen,
@@ -744,6 +759,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
 function ChatPage({
   messages,
   isSending,
+  showQhbStatus,
   input,
   setInput,
   placeholder,
@@ -763,6 +779,7 @@ function ChatPage({
 }: {
   messages: PrototypeMessage[];
   isSending: boolean;
+  showQhbStatus: boolean;
   input: string;
   setInput: (value: string) => void;
   placeholder: string;
@@ -808,13 +825,20 @@ function ChatPage({
             setMiniNote={setMiniNote}
           />
         ))}
+        {showQhbStatus && (
+          <div className="dl2-message ai">
+            <div className="qhb-status-bar">
+              <span className="qhb-status-icon">🔍</span>
+              <span className="qhb-status-text">正在查询清北学生资料...</span>
+            </div>
+          </div>
+        )}
         {isSending && (
           messages[messages.length - 1]?.type === "user" ||
           (messages[messages.length - 1]?.type === "normal_reply" && !messages[messages.length - 1]?.content)
         ) && (
           <div className="dl2-message ai">
             <div className="dl2-ai-bubble dl2-thinking">
-              <span>模型正在思考中哦</span>
               <i />
               <i />
               <i />
@@ -1105,6 +1129,15 @@ function MessageRenderer(props: {
       <div className="dl2-ai-bubble">
         <TextBlock text={message.content ?? ""} />
         <MessageTools text={message.content ?? ""} copyText={props.copyText} openMenu={props.openMessageMenu} />
+        {message.keyQuestion && (
+          <article className="dl2-key-question dl2-key-question-inline">
+            <div className="dl2-capsule">关键追问</div>
+            <p>{message.keyQuestion}</p>
+            <div className="dl2-card-actions quiet">
+              <button type="button" onClick={() => props.copyText(message.keyQuestion!, "已复制关键追问")}>复制</button>
+            </div>
+          </article>
+        )}
       </div>
       {message.memoryNote && (
         <button className="dl2-memory-note" type="button" onClick={() => props.setMiniNote(message.memoryDetail ?? message.memoryNote ?? "")}>
@@ -1525,7 +1558,7 @@ function ChildQuestionnaireParentPage({
           {link && <div className="dl2-link-box">{link}</div>}
           <div className="dl2-page-actions stacked">
             <button type="button" onClick={generateLink}>生成填写链接</button>
-            <button type="button" onClick={() => copyText(link || "https://demo.yihe.site/child-card/abc123")}>复制链接</button>
+            <button type="button" onClick={() => copyText(link || "https://wj.qq.com/s2/26734354/idnz/")}>复制链接</button>
             <button type="button" onClick={() => showToast("已生成二维码")}>生成二维码</button>
             <button type="button" onClick={() => showToast("已打开微信分享提示")}>分享到微信</button>
             <button type="button" onClick={() => navigate("child-form")}>预览孩子端填写</button>

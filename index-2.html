@@ -1,0 +1,3761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>对话实验室</title>
+<script>
+  window.PAGE_VERSION = '20';
+  var storedVersion = localStorage.getItem('qhb_page_version');
+  if (storedVersion && storedVersion !== '16') {
+    localStorage.setItem('qhb_page_version', '16');
+    location.href = location.href.split('?')[0] + '?v=16';
+  } else {
+    localStorage.setItem('qhb_page_version', '16');
+  }
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; writing-mode: horizontal-tb !important; text-orientation: mixed !important; }
+  .qhb-label, .msg-content, .msg-bubble, .msg-row, .chat-area { writing-mode: horizontal-tb !important; text-orientation: mixed !important; white-space: normal !important; }
+  :root {
+    /* 品牌主色 */
+    --primary-blue: #2F6BFF;
+    --primary-blue-dark: #1D4ED8;
+    --primary-blue-light: #EAF2FF;
+
+    /* 清华紫 */
+    --tsinghua-purple: #6D5BD0;
+    --tsinghua-purple-dark: #4F46A5;
+    --tsinghua-purple-light: #F1F0FF;
+
+    /* 北大红 */
+    --peking-red: #B91C1C;
+    --peking-red-soft: #DC2626;
+    --peking-red-light: #FEF2F2;
+
+    /* 学术深蓝 */
+    --academic-navy: #172554;
+    --academic-navy-soft: #1E3A8A;
+
+    /* 辅助色 */
+    --gold: #F5B84B;
+    --gold-light: #FFF7E6;
+    --green: #16A34A;
+    --green-light: #ECFDF5;
+    --orange: #F97316;
+    --orange-light: #FFF7ED;
+    --red: #EF4444;
+    --red-light: #FEF2F2;
+
+    /* 中性色 */
+    --text-main: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --text-light: #94A3B8;
+
+    --bg-page: #F6F8FF;
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-soft: #F8FAFC;
+    --border-soft: rgba(148, 163, 184, 0.18);
+    --border: #E5E7EB;
+    --input-bg: #F3F4F6;
+
+    /* 兼容性原有变量 */
+    --bg: #FFFFFF;
+    --text: #111111;
+    --user-bubble: #10B981;
+    --user-text: #FFFFFF;
+    --radius: 16px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06);
+    --page-padding: 16px;
+    --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  }
+  body {
+    font-family: var(--font);
+    background:
+      radial-gradient(circle at 20% 0%, rgba(109, 91, 208, 0.12) 0%, transparent 28%),
+      radial-gradient(circle at 90% 10%, rgba(47, 107, 255, 0.12) 0%, transparent 30%),
+      linear-gradient(180deg, #EEF4FF 0%, #F8FAFF 44%, #FFFFFF 100%);
+    color: var(--text-main);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  .app-container {
+    width: 100%;
+    max-width: 430px;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    position: relative;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+
+  /* 顶部导航栏 */
+  .navbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px var(--page-padding);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 10;
+  }
+  .navbar-left, .navbar-right {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .navbar-left svg, .navbar-right svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--text-secondary);
+  }
+  .navbar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    text-align: center;
+  }
+
+  /* 对话区 */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px var(--page-padding) 8px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chat-area::-webkit-scrollbar { display: none; }
+
+  .msg-row {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    animation: msgIn 0.25s ease both;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-row.user {
+    justify-content: flex-end;
+  }
+  .msg-row.ai {
+    justify-content: flex-start;
+  }
+  .msg-content-wrap {
+    display: block;
+    width: 100%;
+    max-width: 90%;
+    min-width: 220px;
+  }
+  .msg-row.user .msg-content-wrap {
+    max-width: 85%;
+    min-width: 120px;
+  }
+
+  .msg-avatar { display: none; }
+
+  .msg-bubble {
+    width: 100%;
+    min-width: 220px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    font-size: 16px;
+    line-height: 1.5;
+    word-break: break-word;
+    position: relative;
+  }
+  .msg-row.ai .msg-bubble {
+    background: var(--bg);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .msg-row.user .msg-bubble {
+    background: var(--user-bubble);
+    color: var(--user-text);
+  }
+
+  .msg-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-align: center;
+  }
+  .msg-row.ai .msg-meta { text-align: left; }
+  .qhb-label {
+    display: none;
+  }
+  /* 全局查询状态条（豆包风格，放在输入框上方） */
+  .qhb-status-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px var(--page-padding);
+    background: #F0FDF4;
+    border-top: 1px solid #DCFCE7;
+    font-size: 13px;
+    color: #15803D;
+    animation: statusBarIn 0.3s ease;
+  }
+  @keyframes statusBarIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .qhb-status-bar.fadeout {
+    animation: statusBarOut 0.5s ease forwards;
+  }
+  @keyframes statusBarOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  .qhb-status-icon {
+    font-size: 14px;
+  }
+  .qhb-status-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 打字动画指示器 */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 14px;
+  }
+  .typing-indicator span {
+    width: 7px;
+    height: 7px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    animation: typingBounce 1.2s infinite ease-in-out;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+  .typing-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 10px;
+  }
+
+  /* 底部输入区 */
+  .input-area {
+    flex-shrink: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 8px var(--page-padding);
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .input-plus {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--input-bg);
+  }
+  .input-plus svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--text-secondary);
+  }
+  .input-box {
+    flex: 1;
+    background: var(--input-bg);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 16px;
+    color: var(--text);
+    border: 1px solid var(--border);
+    outline: none;
+    font-family: var(--font);
+    resize: none;
+    max-height: 120px;
+    min-height: 40px;
+    line-height: 1.5;
+  }
+  .input-box::placeholder { color: var(--text-muted); }
+  .send-btn {
+    font-size: 16px;
+    color: #CCCCCC;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 4px;
+    flex-shrink: 0;
+    font-family: var(--font);
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .send-btn.active { color: var(--user-bubble); }
+  /* CSS兜底：当输入框有内容时，兄弟节点发送按钮变绿 */
+  .input-box:not(:placeholder-shown) ~ .send-btn { color: #10B981 !important; }
+
+  /* 大语音按钮（豆包风格） */
+  .voice-btn-large {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--input-bg);
+    transition: all 0.2s ease;
+    order: -1;
+  }
+  .voice-btn-large.recording {
+    background: #FEE2E2;
+    animation: pulse 1s infinite;
+  }
+  .voice-btn-large.recording svg {
+    stroke: #EF4444;
+  }
+  .voice-btn-large:active {
+    transform: scale(0.95);
+  }
+  .voice-btn-large svg {
+    width: 28px;
+    height: 28px;
+    stroke: var(--text-secondary);
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.2s;
+  }
+
+  /* 简单录音条 - 禁止一切文字选中 */
+  .recording-bar,
+  .recording-bar *,
+  .recording-bar-content,
+  .recording-bar-text,
+  .recording-wave-small,
+  .recording-wave-small span {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-touch-callout: none !important;
+    touch-action: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  .recording-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #FFFFFF;
+    z-index: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    pointer-events: auto;
+  }
+  .recording-bar.active {
+    display: flex;
+    transform: translateY(0);
+  }
+  .recording-bar-content {
+    width: 100%;
+    max-width: 430px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  
+  /* 小波形动画 */
+  .recording-wave-small {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    height: 36px;
+  }
+  .recording-wave-small span {
+    width: 5px;
+    background: #EF4444;
+    border-radius: 3px;
+    animation: waveSmall 0.7s infinite ease-in-out;
+  }
+  .recording-wave-small span:nth-child(1) { animation-delay: 0s; height: 15px; }
+  .recording-wave-small span:nth-child(2) { animation-delay: 0.1s; height: 22px; }
+  .recording-wave-small span:nth-child(3) { animation-delay: 0.2s; height: 30px; }
+  .recording-wave-small span:nth-child(4) { animation-delay: 0.3s; height: 22px; }
+  .recording-wave-small span:nth-child(5) { animation-delay: 0.4s; height: 15px; }
+  @keyframes waveSmall {
+    0%, 100% { transform: scaleY(0.6); }
+    50% { transform: scaleY(1); }
+  }
+  
+  .recording-bar-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: #111;
+    flex: 1;
+    text-align: left;
+  }
+  .recording-stop-btn {
+    background: #EF4444;
+    color: #FFFFFF;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s, background 0.2s;
+  }
+  .recording-stop-btn:active {
+    transform: scale(0.95);
+    background: #DC2626;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  /* 录音提示遮罩层 */
+  .recording-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .recording-overlay.active { display: flex; }
+  .recording-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #EF4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 1s infinite;
+  }
+  .recording-icon svg {
+    width: 50px;
+    height: 50px;
+    stroke: #FFFFFF;
+    stroke-width: 2;
+    fill: none;
+  }
+  .recording-text {
+    color: #FFFFFF;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .recording-hint {
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+  }
+  .recording-wave {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    height: 40px;
+  }
+  .recording-wave span {
+    width: 6px;
+    background: #FFFFFF;
+    border-radius: 3px;
+    animation: wave 0.8s infinite ease-in-out;
+  }
+  .recording-wave span:nth-child(1) { animation-delay: 0s; height: 15px; }
+  .recording-wave span:nth-child(2) { animation-delay: 0.15s; height: 25px; }
+  .recording-wave span:nth-child(3) { animation-delay: 0.3s; height: 35px; }
+  .recording-wave span:nth-child(4) { animation-delay: 0.45s; height: 25px; }
+  .recording-wave span:nth-child(5) { animation-delay: 0.6s; height: 15px; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1); }
+  }
+
+  /* AI 回复播放按钮 */
+  .msg-play-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--input-bg);
+    cursor: pointer;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+  .msg-play-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--text-secondary);
+  }
+
+  /* 问题高亮 */
+  .highlight-question {
+    display: block;
+    background: rgba(16,185,129,0.06);
+    border-left: 4px solid var(--user-bubble);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    color: #047857;
+    font-weight: 600;
+  }
+  .bold-last { font-weight: 600; }
+
+  /* 语音提示条 */
+  .voice-hint-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: transparent;
+    flex-shrink: 0;
+  }
+  .voice-hint-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* ========== 语音优先输入区域 ========== */
+  .voice-input-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .voice-hint-text {
+    position: fixed;
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 4px;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s;
+    z-index: 55;
+  }
+  .voice-hint-text.hidden { opacity: 0; }
+  .input-tool-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--input-bg);
+    border: none;
+    padding: 0;
+  }
+  .input-tool-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--text-secondary);
+    stroke-width: 2;
+    fill: none;
+  }
+  .voice-hold-btn {
+    flex: 1;
+    height: 44px;
+    border-radius: 22px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    transition: all 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+  }
+  .voice-hold-btn .voice-hold-text {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .voice-hold-btn:active {
+    background: #F3F4F6;
+    transform: scale(0.98);
+  }
+  .voice-hold-btn.recording {
+    background: #FEE2E2;
+    border-color: #EF4444;
+    color: #DC2626;
+  }
+  .voice-hold-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+  .text-input-area {
+    display: none;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+  }
+  .text-input-area.active {
+    display: flex;
+  }
+
+  /* 语音/文字输入模式容器 */
+  .input-mode-voice,
+  .input-mode-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* 侧边栏 */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    z-index: 150;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .sidebar-overlay.active { display: block; opacity: 1; }
+  
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 80vw;
+    background: var(--bg);
+    z-index: 151;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  }
+  .sidebar.active { transform: translateX(0); }
+  
+  .sidebar-header {
+    flex-shrink: 0;
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .sidebar-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  
+  .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .menu-item:hover { background: #F9FAFB; }
+  .menu-item:active { background: #F3F4F6; }
+  .menu-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .menu-text {
+    font-size: 16px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  
+  /* 页面容器 */
+  .page-container {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 160;
+    display: none;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  .page-container.active { 
+    display: flex; 
+    transform: translateX(0);
+  }
+  .page-container.active .page-content {
+    animation: contentFadeIn 0.4s ease 0.1s both;
+  }
+  @keyframes contentFadeIn {
+    from { 
+      opacity: 0; 
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0);
+    }
+  }
+
+  /* 菜单项点击动效 */
+  .menu-item {
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .menu-item:active {
+    transform: scale(0.96);
+  }
+
+  /* 卡片悬停效果 */
+  .info-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  /* 按钮点击动效 */
+  .send-btn, .voice-btn, .input-plus {
+    transition: transform 0.1s ease;
+  }
+  .send-btn:active, .voice-btn:active, .input-plus:active {
+    transform: scale(0.92);
+  }
+
+  /* 渐变按钮动效 */
+  .page-back, .navbar-left, .navbar-right {
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .page-back:active, .navbar-left:active, .navbar-right:active {
+    transform: scale(0.9);
+  }
+
+  /* 加载时的骨架动效 */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* 淡入动画 */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 弹性缩放 */
+  @keyframes bounceScale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  /* 侧边栏菜单项进入动画 */
+  .sidebar.active .menu-item {
+    animation: slideInFromLeft 0.4s ease both;
+  }
+  .sidebar.active .menu-item:nth-child(1) { animation-delay: 0.05s; }
+  .sidebar.active .menu-item:nth-child(2) { animation-delay: 0.1s; }
+  .sidebar.active .menu-item:nth-child(3) { animation-delay: 0.15s; }
+  .sidebar.active .menu-item:nth-child(4) { animation-delay: 0.2s; }
+  .sidebar.active .menu-item:nth-child(5) { animation-delay: 0.25s; }
+  .sidebar.active .menu-item:nth-child(6) { animation-delay: 0.3s; }
+  @keyframes slideInFromLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* 页面卡片渐入动画 */
+  .info-card {
+    animation: cardFadeInUp 0.5s ease both;
+  }
+  .info-card:nth-of-type(1) { animation-delay: 0.1s; }
+  .info-card:nth-of-type(2) { animation-delay: 0.15s; }
+  .info-card:nth-of-type(3) { animation-delay: 0.2s; }
+  .info-card:nth-of-type(4) { animation-delay: 0.25s; }
+  @keyframes cardFadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .page-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 12px var(--page-padding);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .page-back {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 8px;
+  }
+  .page-back svg { width: 24px; height: 24px; fill: var(--text-secondary); }
+  .page-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  
+  .page-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px var(--page-padding);
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 新设计风格的增强样式 */
+  .page-header-enhanced {
+    background: linear-gradient(135deg, #7C5CFC 0%, #6366F1 100%);
+    padding: 20px var(--page-padding);
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    color: #FFFFFF;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header-enhanced::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  .page-header-enhanced::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 150px;
+    height: 150px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+  .page-header-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .page-header-subtitle {
+    font-size: 13px;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 精致卡片样式 */
+  .card-enhanced {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #F3F4F6;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  }
+  .card-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid #F3F4F6;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+  }
+  .card-body {
+    padding: 16px;
+  }
+
+  /* 标签样式 */
+  .tag-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+  .tag-purple { background: #EDE9FE; color: #6D28D9; }
+  .tag-green { background: #D1FAE5; color: #047857; }
+  .tag-blue { background: #DBEAFE; color: #1D4ED8; }
+  .tag-orange { background: #FFEDD5; color: #C2410C; }
+  .tag-red { background: #FEE2E2; color: #DC2626; }
+
+  /* 头像样式 */
+  .avatar-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+  }
+
+  /* 进度条美化 */
+  .progress-track {
+    height: 8px;
+    background: #E5E7EB;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #7C5CFC, #6366F1);
+    transition: width 0.5s ease;
+  }
+
+  /* 按钮美化 */
+  .btn-primary {
+    background: linear-gradient(135deg, #7C5CFC 0%, #6366F1 100%);
+    color: #FFFFFF;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+
+  /* ========== 设计系统 CSS ========== */
+  
+  /* 手机容器尺寸 */
+  .mobile-container {
+    width: 100%;
+    max-width: 390px;
+    margin: 0 auto;
+  }
+
+  /* 设计系统卡片 */
+  .ds-card {
+    border-radius: 16px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-card);
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    
+  }
+
+  /* 主按钮 - 蓝紫渐变 */
+  .ds-btn-primary {
+    height: 44px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--tsinghua-purple) 100%);
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 20px rgba(47, 107, 255, 0.28);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .ds-btn-primary:active { transform: scale(0.98); }
+
+  /* 次级按钮 */
+  .ds-btn-secondary {
+    height: 40px;
+    border-radius: 14px;
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+    font-weight: 600;
+    font-size: 13px;
+    border: 1px solid #BFDBFE;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .ds-btn-secondary:active { transform: scale(0.98); }
+
+  /* 清华标签 */
+  .tag-tsinghua {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    background: var(--tsinghua-purple-light);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--tsinghua-purple-dark);
+    border: 1px solid #DDD6FE;
+  }
+  .tag-tsinghua .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tsinghua-purple);
+  }
+
+  /* 北大标签 */
+  .tag-peking {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    background: var(--peking-red-light);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--peking-red);
+    border: 1px solid #FECACA;
+  }
+  .tag-peking .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--peking-red-soft);
+  }
+
+  /* 清北认证标签 */
+  .tag-certified {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    background: var(--primary-blue-light);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary-blue);
+    border: 1px solid #BFDBFE;
+  }
+
+  /* 热门标签 */
+  .tag-hot {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    background: var(--red-light);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--red);
+  }
+
+  /* 新帖标签 */
+  .tag-new {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    background: var(--orange-light);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--orange);
+  }
+
+  /* 学习方法标签 */
+  .tag-method {
+    border-radius: 9999px;
+    background: var(--primary-blue-light);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--primary-blue);
+  }
+
+  /* 二级页面头部渐变 */
+  .page-header-purple {
+    background: linear-gradient(135deg, rgba(47,107,255,0.14) 0%, rgba(109,91,208,0.12) 100%);
+  }
+  .page-header-navy {
+    background: linear-gradient(135deg, var(--academic-navy) 0%, var(--primary-blue) 58%, var(--tsinghua-purple) 100%);
+  }
+
+  /* 分段按钮 */
+  .segment-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #6B7280;
+    transition: all 0.2s ease;
+  }
+  .segment-btn.active {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--tsinghua-purple) 100%);
+    color: #FFFFFF;
+  }
+
+  /* 统计数字 */
+  .stat-number {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #7C5CFC, #6366F1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* 欢迎提示 */
+  .welcome-hint {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .welcome-hint .welcome-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  /* 诊断卡弹窗 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .modal-overlay.active { display: flex; opacity: 1; }
+  .modal-panel {
+    background: var(--bg);
+    width: 100%;
+    max-width: 430px;
+    max-height: 92vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    padding: 20px var(--page-padding) 30px;
+  }
+  .modal-overlay.active .modal-panel { transform: translateY(0); }
+  .modal-close {
+    text-align: center;
+    margin-bottom: 4px;
+    cursor: pointer;
+    padding: 20px 0 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+  }
+  .modal-close-line {
+    width: 56px;
+    height: 6px;
+    background: #9CA3AF;
+    border-radius: 3px;
+  }
+  .modal-close-text {
+    font-size: 13px;
+    color: #6B7280;
+    line-height: 1;
+    font-weight: 500;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  /* 诊断卡内容 */
+  .diagnosis-card {
+    background: var(--bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .diagnosis-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .diagnosis-section {
+    margin-bottom: 16px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .diagnosis-section-blind {
+    background: linear-gradient(135deg, rgba(109,91,208,0.08), rgba(47,107,255,0.08));
+    border: 1px solid rgba(109,91,208,0.18);
+  }
+  .diagnosis-section-mechanism {
+    background: rgba(234,242,255,0.8);
+    border: 1px solid rgba(47,107,255,0.15);
+  }
+  .diagnosis-section-protect {
+    background: rgba(236,253,245,0.8);
+    border: 1px solid rgba(22,163,74,0.15);
+  }
+  .diagnosis-section-predict {
+    background: rgba(255,247,230,0.8);
+    border: 1px solid rgba(245,184,75,0.2);
+  }
+  .diagnosis-section-boundary {
+    background: rgba(248,250,252,0.8);
+    border: 1px solid rgba(148,163,184,0.2);
+  }
+  .diagnosis-section-advice {
+    background: rgba(234,242,255,0.6);
+    border: 1px solid rgba(47,107,255,0.12);
+  }
+  .diagnosis-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .diagnosis-label-blind {
+    background: rgba(109,91,208,0.15);
+    color: #4F46A5;
+  }
+  .diagnosis-label-mechanism {
+    background: rgba(47,107,255,0.12);
+    color: #2F6BFF;
+  }
+  .diagnosis-label-protect {
+    background: rgba(22,163,74,0.12);
+    color: #16A34A;
+  }
+  .diagnosis-label-predict {
+    background: rgba(245,184,75,0.15);
+    color: #B8860B;
+  }
+  .diagnosis-label-boundary {
+    background: rgba(148,163,184,0.15);
+    color: #64748B;
+  }
+  .diagnosis-label-advice {
+    background: rgba(47,107,255,0.1);
+    color: #2F6BFF;
+  }
+  .diagnosis-value {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #334155;
+  }
+  .diagnosis-value strong {
+    color: #0F172A;
+  }
+  .diagnosis-explain-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #334155;
+  }
+  .diagnosis-explain-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6D5BD0;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+  .core-judgment {
+    background: var(--bg);
+    border: 2px solid #7C5CFC;
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  .core-judgment .tag {
+    display: inline-block;
+    background: #7C5CFC;
+    color: #fff;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .core-judgment p { font-size: 15px; line-height: 1.6; }
+  .core-judgment .disclaimer {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+  .prob-bar {
+    margin-bottom: 12px;
+  }
+  .prob-bar-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .prob-bar-track {
+    height: 8px;
+    background: #E5E7EB;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .prob-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0;
+    transition: width 1s ease;
+  }
+  .risk-box {
+    background: #FEF3C7;
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #92400E;
+  }
+  .reply-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .reply-tab {
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .reply-tab.active {
+    background: var(--user-bubble);
+    color: #fff;
+    border-color: var(--user-bubble);
+  }
+  .reply-content {
+    background: var(--input-bg);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-size: 15px;
+    line-height: 1.7;
+    margin-bottom: 8px;
+  }
+  .reply-reason {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* 伴学卡片 */
+  .tutor-card {
+    background: linear-gradient(135deg, #4C1D95, #7C3AED);
+    border-radius: var(--radius);
+    padding: 18px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .tutor-card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 70%);
+    border-radius: 50%;
+  }
+  .tutor-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #F59E0B;
+    color: #111;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .tutor-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .tutor-desc { font-size: 13px; opacity: 0.85; line-height: 1.5; margin-bottom: 14px; }
+  .tutor-schools {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tutor-school {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(4px);
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+  }
+  .tutor-cta {
+    background: linear-gradient(135deg, #F59E0B, #FBBF24);
+    color: #111;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px;
+    border-radius: var(--radius);
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .tutor-cta:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+
+  /* 子页面 */
+  .subpage {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    animation: subpageIn 0.3s ease;
+  }
+  .subpage.active { display: flex; }
+  @keyframes subpageIn {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+  .subpage-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 12px var(--page-padding);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .subpage-back {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .subpage-back svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--text-secondary);
+  }
+  .subpage-title {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    padding-right: 36px;
+  }
+  .subpage-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px var(--page-padding);
+  }
+  .info-card {
+    background: var(--bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .info-card h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .info-card p, .info-card li {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .info-card ul { padding-left: 18px; }
+  .info-card li { margin-bottom: 6px; }
+
+  /* 分享浮层 */
+  .share-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 300;
+  }
+  .share-overlay.active { display: flex; }
+  .share-panel {
+    background: var(--bg);
+    width: 100%;
+    max-width: 430px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 20px var(--page-padding) 30px;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .share-overlay.active .share-panel { transform: translateY(0); }
+  .share-url-box {
+    background: var(--input-bg);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 14px;
+    word-break: break-all;
+    margin: 12px 0;
+    color: var(--text-secondary);
+  }
+  .share-copy-btn {
+    background: var(--user-bubble);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+  .share-cancel {
+    text-align: center;
+    margin-top: 12px;
+    color: var(--text-muted);
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  /* 长按菜单 */
+  .longpress-menu {
+    position: fixed;
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 8px 0;
+    z-index: 400;
+    display: none;
+    min-width: 140px;
+  }
+  .longpress-menu.active { display: block; }
+  .longpress-item {
+    padding: 10px 18px;
+    font-size: 15px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .longpress-item:hover { background: var(--input-bg); }
+  .longpress-item.delete { color: #EF4444; }
+</style>
+</head>
+<body>
+<div class="app-container" id="app">
+
+  <!-- 顶部导航栏 -->
+  <div class="navbar">
+    <div class="navbar-left" onclick="toggleSidebar(true)">
+      <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </div>
+    <div class="navbar-title">对话实验室</div>
+    <div class="navbar-right" onclick="showSubpage('historyPage')">
+      <svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+    </div>
+  </div>
+
+  <!-- 对话区 -->
+  <div class="chat-area" id="chatArea">
+    <div class="welcome-hint" id="welcomeHint">
+      <div class="welcome-title">👋 欢迎来到对话实验室</div>
+      <div>我是你的AI助手，帮你分析亲子沟通中的问题。<br>请描述你和孩子之间的情况，我会逐步帮你理清思路。</div>
+    </div>
+  </div>
+
+  <!-- 全局查询状态条（豆包风格） -->
+  <div class="qhb-status-bar" id="qhbStatusBar" style="display:none;">
+    <span class="qhb-status-icon">🔍</span>
+    <span class="qhb-status-text" id="qhbStatusText">正在查询清北学生资料...</span>
+  </div>
+
+  <!-- 语音提示条 -->
+  <div class="voice-hint-bar" id="voiceHintBar">
+    <span class="voice-hint-text">按住说 30 秒，AI 帮你整理</span>
+  </div>
+
+  <!-- 底部输入区 -->
+  <div class="input-area" id="inputArea">
+    <!-- 语音模式（默认） -->
+    <div class="input-mode-voice" id="inputModeVoice">
+      <div class="voice-hold-btn" id="voiceHoldBtn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchstart="startVoiceRecording()" ontouchend="stopVoiceRecording()" onselectstart="return false" oncontextmenu="return false">
+        <span class="voice-hold-text" onselectstart="return false" oncontextmenu="return false">按住说话</span>
+      </div>
+      <div class="input-tool-btn" onclick="switchToTextMode()">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
+      </div>
+      <div class="input-tool-btn" onclick="alert('功能面板即将上线')">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+    </div>
+    <!-- 文字模式 -->
+    <div class="input-mode-text" id="inputModeText" style="display:none;">
+      <textarea class="input-box" id="inputBox" placeholder="有什么可以帮你的吗？" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';updateSendBtn();" onkeyup="updateSendBtn();" onpaste="setTimeout(updateSendBtn,50);" onfocus="updateSendBtn();" onblur="updateSendBtn();"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" style="color:#CCCCCC;">发送</button>
+      <div class="input-tool-btn" onclick="switchToVoiceMode()">
+        <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 简单录音提示条 -->
+  <div class="recording-bar" id="recordingBar" onselectstart="return false">
+    <div class="recording-bar-content" onselectstart="return false">
+      <div class="recording-wave-small">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <span id="recordingBarText" class="recording-bar-text" onselectstart="return false">正在录音，松手自动发送</span>
+    </div>
+  </div>
+
+  <!-- 诊断卡弹窗 -->
+  <div class="modal-overlay" id="diagnosisModal" onclick="if(event.target===this)closeDiagnosisModal()">
+    <div class="modal-panel" onclick="event.stopPropagation()">
+      <div class="modal-close" id="modalDragHandle">
+        <div class="modal-close-line"></div>
+        <div class="modal-close-text">下滑关闭</div>
+      </div>
+      <div class="modal-title">诊断卡</div>
+      <div id="diagnosisContent"></div>
+    </div>
+  </div>
+
+
+
+  <!-- 伴学详情子页面 -->
+  <div class="subpage" id="tutorDetailPage">
+    <div class="subpage-header">
+      <div class="subpage-back" onclick="hideSubpage('tutorDetailPage')">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </div>
+      <div class="subpage-title">清北学霸伴学服务</div>
+    </div>
+    <div class="subpage-body">
+      <div class="info-card">
+        <h4>服务介绍</h4>
+        <p>基于本次诊断结果，我们将为你匹配一位清华或北大的学霸，提供一对一的伴学辅导服务。学霸会根据孩子的具体情况，帮助家长制定更精准的沟通策略。</p>
+      </div>
+      <div class="info-card">
+        <h4>服务包含</h4>
+        <ul>
+          <li><b>诊断报告解读</b>：学霸逐条解读孩子的底层处境</li>
+          <li><b>定制化行动方案</b>：针对具体分支制定可落地的亲子沟通策略</li>
+          <li><b>1v1 答疑跟进</b>：执行中遇到问题随时提问，获得即时反馈</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h4>预约咨询</h4>
+        <p>点击下方按钮预约专属学霸咨询时间。</p>
+        <button style="margin-top:12px;width:100%;padding:12px;background:linear-gradient(135deg,#F59E0B,#FBBF24);color:#111;border:none;border-radius:16px;font-size:15px;font-weight:600;cursor:pointer;" onclick="alert('预约功能即将上线，敬请期待！')">立即预约咨询</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史记录子页面 -->
+  <div class="subpage" id="historyPage">
+    <div class="subpage-header">
+      <div class="subpage-back" onclick="hideSubpage('historyPage')">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </div>
+      <div class="subpage-title">历史记录</div>
+      <div style="font-size:13px;color:#64748B;cursor:pointer;" onclick="clearAllHistory()">清空</div>
+    </div>
+    <div class="subpage-body" id="historyBody">
+      <!-- 今天 -->
+      <div style="padding:0 16px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;color:#94A3B8;margin-bottom:8px;">今天</div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-001')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">孩子写作业总是拖延怎么办</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">14:32</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">孩子每天写作业都要拖到晚上10点，催他也不听...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#EF4444;font-size:11px;">诊断卡</span>
+            <span style="font-size:12px;color:#94A3B8;">12 条对话</span>
+          </div>
+        </div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-002')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">初二数学成绩下滑怎么补</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">10:15</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">上学期还能考90分，这学期突然降到70多分...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="font-size:12px;color:#94A3B8;">8 条对话</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 昨天 -->
+      <div style="padding:0 16px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;color:#94A3B8;margin-bottom:8px;">昨天</div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-003')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">孩子偏科严重怎么处理</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">20:45</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">语文英语很好，数学物理特别差，每天花最多时间...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#EF4444;font-size:11px;">诊断卡</span>
+            <span style="font-size:12px;color:#94A3B8;">15 条对话</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 7天前 -->
+      <div style="padding:0 16px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:600;color:#94A3B8;margin-bottom:8px;">7天前</div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-004')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">小学三年级注意力不集中</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">1月8日</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">上课总是走神，回家写作业也要不停提醒...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="font-size:12px;color:#94A3B8;">6 条对话</span>
+          </div>
+        </div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-005')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">高中生如何平衡学习和休息</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">1月6日</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">高三了，每天都学到凌晨，但效率越来越低...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#EF4444;font-size:11px;">诊断卡</span>
+            <span style="font-size:12px;color:#94A3B8;">10 条对话</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 更早 -->
+      <div style="padding:0 16px;margin-bottom:40px;">
+        <div style="font-size:13px;font-weight:600;color:#94A3B8;margin-bottom:8px;">更早</div>
+        
+        <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;cursor:pointer;" onclick="loadHistorySession('sess-006')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="font-size:15px;font-weight:600;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">初中生叛逆期怎么沟通</div>
+            <div style="font-size:12px;color:#94A3B8;flex-shrink:0;margin-left:8px;">12月28日</div>
+          </div>
+          <div style="font-size:13px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">说什么都不听，门关起来就是一整天...</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span style="font-size:12px;color:#94A3B8;">9 条对话</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分享浮层 -->
+  <div class="share-overlay" id="shareOverlay" onclick="if(event.target===this)hideShare()">
+    <div class="share-panel">
+      <div style="text-align:center;font-size:16px;font-weight:600;margin-bottom:8px;">分享对话实验室</div>
+      <div style="font-size:13px;color:#999;text-align:center;">复制下方链接发送给朋友</div>
+      <div class="share-url-box" id="shareUrlBox"></div>
+      <button class="share-copy-btn" onclick="copyShareUrl()">复制链接</button>
+      <div class="share-cancel" onclick="hideShare()">取消</div>
+    </div>
+  </div>
+
+  <!-- 长按菜单 -->
+  <div class="longpress-menu" id="longpressMenu">
+    <div class="longpress-item" onclick="copySelectedMessage()">复制</div>
+    <div class="longpress-item delete" onclick="deleteSelectedMessage()">删除</div>
+  </div>
+
+</div>
+
+<script>
+var API_BASE = window.location.origin;
+var state = {
+  messages: [],
+  sessionId: 'sess-' + Math.random().toString(36).slice(2, 10),
+  isLoading: false,
+  turnCount: 0,
+  diagnosisShown: false,
+  currentLongPressMsg: null,
+  currentAiContent: ''
+};
+
+function nowTime() {
+  var d = new Date();
+  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
+function escapeHtml(t) {
+  var d = document.createElement('div');
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+// 自动调整textarea高度
+var inputBox = document.getElementById('inputBox');
+var sendBtn = document.getElementById('sendBtn');
+function updateSendBtn() {
+  if (!inputBox || !sendBtn) return;
+  var hasText = inputBox.value.trim().length > 0;
+  if (hasText) {
+    sendBtn.className = 'send-btn active';
+    sendBtn.style.color = '#10B981';
+  } else {
+    sendBtn.className = 'send-btn';
+    sendBtn.style.color = '#CCCCCC';
+  }
+}
+inputBox.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  updateSendBtn();
+});
+inputBox.addEventListener('keyup', function(e) { updateSendBtn(); });
+inputBox.addEventListener('paste', function() { setTimeout(updateSendBtn, 50); });
+inputBox.addEventListener('focus', updateSendBtn);
+inputBox.addEventListener('blur', updateSendBtn);
+inputBox.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+// 页面加载完成后检查一次输入框内容（处理浏览器自动填充）
+setTimeout(updateSendBtn, 100);
+// 轮询兜底：每200ms检查一次按钮状态，确保始终正确
+setInterval(updateSendBtn, 200);
+// 确保事件绑定成功
+console.log('send-btn events bound ok');
+
+function addMessage(role, text, qhbCount) {
+  var chatArea = document.getElementById('chatArea');
+  document.getElementById('welcomeHint').style.display = 'none';
+
+  var row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+  row.dataset.role = role;
+  row.dataset.raw = text;
+
+  var html = '';
+  if (role === 'ai') {
+    html += '<div class="msg-content-wrap">';
+    html += '<div class="msg-bubble"><div class="msg-content">' + text + '</div></div>';
+    html += '<div class="msg-meta">' + nowTime() + '</div>';
+    html += '</div>';
+  } else {
+    html += '<div class="msg-content-wrap">';
+    html += '<div class="msg-bubble">' + escapeHtml(text) + '</div>';
+    html += '<div class="msg-meta">' + nowTime() + '</div>';
+    html += '</div>';
+  }
+  row.innerHTML = html;
+  chatArea.appendChild(row);
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  // 长按菜单
+  if (role === 'ai') {
+    var bubble = row.querySelector('.msg-bubble');
+    var pressTimer;
+    bubble.addEventListener('touchstart', function(e) {
+      pressTimer = setTimeout(() => showLongPressMenu(e, row), 500);
+    });
+    bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
+    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    bubble.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      showLongPressMenu(e, row);
+    });
+  }
+
+  state.messages.push({ role, content: text });
+}
+
+// ===== 输入模式切换 =====
+var isVoiceMode = true; // 默认语音优先
+
+function switchToTextMode() {
+  isVoiceMode = false;
+  document.getElementById('inputModeVoice').style.display = 'none';
+  document.getElementById('inputModeText').style.display = 'flex';
+  var hintBar = document.getElementById('voiceHintBar');
+  if (hintBar) hintBar.style.display = 'none';
+  // 聚焦输入框
+  setTimeout(function() {
+    var inputBox = document.getElementById('inputBox');
+    if (inputBox) inputBox.focus();
+  }, 100);
+}
+
+function switchToVoiceMode() {
+  isVoiceMode = true;
+  document.getElementById('inputModeVoice').style.display = 'flex';
+  document.getElementById('inputModeText').style.display = 'none';
+  var hintBar = document.getElementById('voiceHintBar');
+  if (hintBar) hintBar.style.display = 'flex';
+}
+
+function addTypingIndicator() {
+  var chatArea = document.getElementById('chatArea');
+  document.getElementById('welcomeHint').style.display = 'none';
+  var row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = 'typingRow';
+  var count = 0;
+  row.innerHTML = '<div class="msg-bubble typing-indicator"><span></span><span></span><span></span></div>';
+  chatArea.appendChild(row);
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  // 显示全局查询状态条
+  var statusBar = document.getElementById('qhbStatusBar');
+  var statusText = document.getElementById('qhbStatusText');
+  statusBar.style.display = 'flex';
+  statusBar.classList.remove('fadeout');
+  statusText.textContent = '正在查询清北学生资料，已查询 1 位';
+
+  var timer = setInterval(() => {
+    count++;
+    if (statusText) statusText.textContent = '正在查询清北学生资料，已查询 ' + (count + 1) + ' 位';
+  }, 200);
+
+  return {
+    stop: function() {
+      clearInterval(timer);
+      return count + 1;
+    },
+    remove: function() {
+      clearInterval(timer);
+      row.remove();
+    }
+  };
+}
+
+// ===== 语音功能（原生 SpeechRecognition）- 按住说话模式 =====
+var isButtonPressed = false;
+var isRecording = false;
+var recognition = null;
+var currentAudioPlayer = null;
+var voiceFinalTranscript = '';
+var voiceResultHandled = false;
+var voiceTimeoutId = null;
+var globalReleaseHandler = null;
+var recordingStartTime = 0;
+var micPermissionGranted = false; // 标记麦克风权限是否已获得
+
+function cleanupRecordingUI() {
+  var voiceBtn = document.getElementById('voiceHoldBtn');
+  if (voiceBtn) voiceBtn.classList.remove('recording');
+  var bar = document.getElementById('recordingBar');
+  if (bar) bar.classList.remove('active');
+}
+
+function resetVoiceState() {
+  isButtonPressed = false;
+  isRecording = false;
+  voiceFinalTranscript = '';
+  if (voiceTimeoutId) {
+    clearTimeout(voiceTimeoutId);
+    voiceTimeoutId = null;
+  }
+  if (globalReleaseHandler) {
+    document.removeEventListener('mouseup', globalReleaseHandler, true);
+    document.removeEventListener('touchend', globalReleaseHandler, true);
+    globalReleaseHandler = null;
+  }
+}
+
+function startVoiceRecording() {
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('您的浏览器不支持语音识别功能，请使用 Chrome 或 Edge 浏览器');
+    return;
+  }
+  
+  // 如果已有旧的识别实例在运行，先强行停止
+  if (recognition) {
+    try { recognition.stop(); } catch (e) {}
+    recognition = null;
+  }
+  
+  isButtonPressed = true;
+  isRecording = false;
+  voiceFinalTranscript = '';
+  voiceResultHandled = false;
+  
+  // 绑定全局松开监听（捕获阶段），权限弹窗期间也能捕获到鼠标/手指抬起
+  globalReleaseHandler = function(e) {
+    if (!isButtonPressed) return;
+    stopVoiceRecording();
+  };
+  document.addEventListener('mouseup', globalReleaseHandler, true);
+  document.addEventListener('touchend', globalReleaseHandler, true);
+  
+  // 关键：权限分离策略
+  // 如果权限尚未获取，先请求权限，但这次不录音，等用户下次按住时再录
+  if (!micPermissionGranted && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    // 显示提示，告诉用户需要授权
+    var voiceBtn = document.getElementById('voiceHoldBtn');
+    if (voiceBtn) voiceBtn.classList.add('recording');
+    var bar = document.getElementById('recordingBar');
+    if (bar) bar.classList.add('active');
+    var barText = document.getElementById('recordingBarText');
+    if (barText) barText.textContent = '请允许麦克风权限...';
+    
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        // 拿到权限后立即关闭 MediaStream
+        stream.getTracks().forEach(function(track) { track.stop(); });
+        micPermissionGranted = true;
+        // 权限获取成功，本次不录音，恢复UI
+        stopVoiceRecording();
+      })
+      .catch(function(err) {
+        console.error('Microphone permission denied:', err);
+        alert('请允许使用麦克风才能使用语音输入功能');
+        stopVoiceRecording();
+      });
+    return; // 第一次只获取权限，不录音
+  }
+  
+  // 权限已获取，直接开始录音
+  // 立即显示UI，给用户即时反馈
+  var voiceBtn = document.getElementById('voiceHoldBtn');
+  if (voiceBtn) voiceBtn.classList.add('recording');
+  var bar = document.getElementById('recordingBar');
+  if (bar) bar.classList.add('active');
+  var barText = document.getElementById('recordingBarText');
+  if (barText) barText.textContent = '正在录音，松手自动发送';
+  
+  doStartRecognition();
+}
+
+function doStartRecognition() {
+  // 再次确认用户还在按着
+  if (!isButtonPressed) return;
+  
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = new SpeechRecognition();
+  recognition = rec;
+  
+  rec.lang = 'zh-CN';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  
+  rec.onstart = function() {
+    // 再次确认用户还在按着
+    if (!isButtonPressed) {
+      try { rec.stop(); } catch (e) {}
+      return;
+    }
+    isRecording = true;
+    
+    // 60 秒自动超时
+    voiceTimeoutId = setTimeout(function() {
+      if (recognition === rec) stopVoiceRecording();
+    }, 60000);
+  };
+  
+  rec.onresult = function(event) {
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        voiceFinalTranscript += event.results[i][0].transcript;
+      }
+    }
+  };
+  
+  rec.onend = function() {
+    if (voiceTimeoutId) {
+      clearTimeout(voiceTimeoutId);
+      voiceTimeoutId = null;
+    }
+    if (isButtonPressed) {
+      // 用户还按着按钮，重新启动识别（说话中间有停顿）
+      try { rec.start(); } catch (e) {}
+    } else {
+      // 用户已经松开了按钮，结束录音
+      isRecording = false;
+      cleanupRecordingUI();
+      handleVoiceResult();
+    }
+  };
+  
+  rec.onerror = function(event) {
+    if (event.error !== 'no-speech' && event.error !== 'aborted') {
+      console.error('Speech recognition error:', event.error);
+    }
+  };
+  
+  rec.start();
+}
+
+function stopVoiceRecording() {
+  isButtonPressed = false;
+  
+  // 恢复默认文案
+  var barText = document.getElementById('recordingBarText');
+  if (barText) barText.textContent = '正在录音，松手自动发送';
+  
+  // 移除全局松开监听
+  if (globalReleaseHandler) {
+    document.removeEventListener('mouseup', globalReleaseHandler, true);
+    document.removeEventListener('touchend', globalReleaseHandler, true);
+    globalReleaseHandler = null;
+  }
+  
+  // 清除超时
+  if (voiceTimeoutId) {
+    clearTimeout(voiceTimeoutId);
+    voiceTimeoutId = null;
+  }
+  
+  // 如果识别实例存在，尝试停止它
+  if (recognition) {
+    try {
+      recognition.stop();
+      // 录音已经开始了，onend 会处理 UI 清理和结果发送
+      if (isRecording) return;
+    } catch (e) {}
+  }
+  
+  // 录音还没开始 或 停止失败，手动清理
+  isRecording = false;
+  cleanupRecordingUI();
+  voiceFinalTranscript = '';
+  recognition = null;
+}
+
+function handleVoiceResult() {
+  if (voiceResultHandled) return;
+  voiceResultHandled = true;
+  
+  var finalText = voiceFinalTranscript.trim();
+  if (finalText) {
+    sendMessage(finalText);
+  }
+  voiceFinalTranscript = '';
+  recognition = null;
+  setTimeout(function() { voiceResultHandled = false; }, 500);
+}
+
+
+
+async function playTTS(text, msgElement) {
+  if (currentAudioPlayer) {
+    currentAudioPlayer.pause();
+    currentAudioPlayer = null;
+  }
+
+  try {
+    var resp = await fetch(API_BASE + '/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    });
+    var result = await resp.json();
+    if (result.status === 'success' && result.audio_url) {
+      currentAudioPlayer = new Audio(result.audio_url);
+      currentAudioPlayer.play();
+    }
+  } catch (err) {
+    console.error('TTS error:', err);
+  }
+}
+
+function sendMessage(text) {
+  var msgInputBox = document.getElementById('inputBox');
+  if (!text) {
+    text = msgInputBox.value.trim();
+  }
+  if (!text || state.isLoading) return;
+
+  if (msgInputBox) {
+    msgInputBox.value = '';
+    msgInputBox.style.height = 'auto';
+  }
+  if (sendBtn) sendBtn.className = 'send-btn';
+
+  addMessage('user', text);
+  state.isLoading = true;
+  state.turnCount++;
+  state.currentAiContent = '';
+
+  var typingCtrl = addTypingIndicator();
+  callAPI(text, typingCtrl);
+}
+
+async function callAPI(userText, typingCtrl) {
+  var payload = {
+    session_id: state.sessionId,
+    stream: true,
+    messages: [{ role: 'user', content: userText }]
+  };
+
+  var fullContent = '';
+  var firstChunk = true;
+  var qhbCount = 0;
+  var aiBubble = null;
+  var buffer = '';
+  var currentEvent = 'message';
+  var diagnosisData = null;
+
+  try {
+    var resp = await fetchWithRetry(API_BASE + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, 2);
+
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder('utf-8');
+
+    function processLines(raw) {
+      var lines = raw.split(/\r?\n/);
+      for (var line of lines) {
+        if (!line.trim()) continue;
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+          continue;
+        }
+        if (!line.startsWith('data:')) continue;
+        var data = line.slice(5).trim();
+        if (data === '[DONE]') continue;
+
+        // event: diagnosis — 结构化诊断数据（后端提取）
+        if (currentEvent === 'diagnosis') {
+          try { diagnosisData = JSON.parse(data); } catch(e) {}
+          currentEvent = 'message';
+          continue;
+        }
+
+        // event: session — 确认 session_id
+        if (currentEvent === 'session') {
+          try {
+            var sess = JSON.parse(data);
+            if (sess.session_id) state.sessionId = sess.session_id;
+          } catch(e) {}
+          currentEvent = 'message';
+          continue;
+        }
+
+        // event: message — 正常内容
+        try {
+          var parsed = JSON.parse(data);
+          var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+          if (!delta || !delta.content) continue;
+
+          var chunkText = delta.content;
+
+          // 轻量兜底过滤（后端已主过滤，此处仅防漏网之鱼）
+          chunkText = chunkText.replace(/###\s*DIAGNOSIS_READY\s*###/gi, '');
+          chunkText = chunkText.replace(/DIAGNOSIS_READY/gi, '');
+          chunkText = chunkText.replace(/---\s*结果\s*\d+.*?---/gi, '');
+          chunkText = chunkText.replace(/相关度[:：]\s*\d+\.\d+/gi, '');
+          chunkText = chunkText.replace(/查询到.*?条结果/gi, '');
+          chunkText = chunkText.replace(/后台想判断|家长标签|不直接采信|转成分支问题|前台必须/gi, '');
+          if (!chunkText) continue;
+
+          if (firstChunk) {
+            qhbCount = typingCtrl.stop();
+            typingCtrl.remove();
+            firstChunk = false;
+
+            var statusBar = document.getElementById('qhbStatusBar');
+            var statusText = document.getElementById('qhbStatusText');
+            if (statusBar && statusText) {
+              statusText.textContent = '本轮查询' + qhbCount + '位清北同学资料';
+              setTimeout(() => {
+                statusBar.classList.add('fadeout');
+                setTimeout(() => { statusBar.style.display = 'none'; }, 500);
+              }, 2000);
+            }
+
+            var chatArea = document.getElementById('chatArea');
+            var row = document.createElement('div');
+            row.className = 'msg-row ai';
+            row.dataset.role = 'ai';
+            row.innerHTML = '<div class="msg-content-wrap"><div class="msg-bubble"><div class="msg-content"></div></div><div class="msg-meta">' + nowTime() + '</div></div>';
+            chatArea.appendChild(row);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            aiBubble = row.querySelector('.msg-content');
+          }
+
+          fullContent += chunkText;
+          state.currentAiContent = fullContent;
+          if (aiBubble) {
+            aiBubble.innerHTML = formatContent(fullContent);
+            var chatArea = document.getElementById('chatArea');
+            chatArea.scrollTop = chatArea.scrollHeight;
+          }
+        } catch (e) {}
+      }
+    }
+
+    while (true) {
+      var { done, value } = await reader.read();
+      if (done) {
+        var tail = decoder.decode();
+        if (tail) buffer += tail;
+        if (buffer.trim()) processLines(buffer);
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      var lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      if (lines.length) processLines(lines.join('\n'));
+    }
+  } catch (err) {
+    typingCtrl.remove();
+    addMessage('ai', '抱歉，连接出现问题，请稍后重试。');
+    state.isLoading = false;
+    return;
+  }
+
+  state.isLoading = false;
+
+  var displayContent = fullContent.trim();
+
+  if (aiBubble) {
+    var html = formatContent(displayContent);
+    html = highlightQuestionInHtml(html);
+    html = boldLastParagraph(html);
+    aiBubble.innerHTML = html;
+
+    var chatArea = document.getElementById('chatArea');
+    var lastRow = chatArea.lastElementChild;
+    if (lastRow) {
+      lastRow.dataset.raw = displayContent;
+      state.messages[state.messages.length - 1] = { role: 'ai', content: displayContent };
+    }
+  }
+
+  // 诊断卡触发：优先使用后端 event:diagnosis 结构化数据
+  // 兜底：如果后端未发送 diagnosis event 但内容包含诊断关键词
+  if (diagnosisData && !state.diagnosisShown) {
+    setTimeout(() => generateDiagnosis(diagnosisData), 800);
+  } else if (!diagnosisData) {
+    var isDiagnosisContent = /家长盲点|核心机制|行为保护|深度诊断|诊断卡/.test(fullContent);
+    if (isDiagnosisContent && !state.diagnosisShown) {
+      setTimeout(() => generateDiagnosis(fullContent), 800);
+    }
+  }
+}
+
+function formatContent(text) {
+  var html = escapeHtml(text);
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  html = html.replace(/__(.+?)__/g, '<u>$1</u>');
+  html = html.replace(/^#{1,6}\s+(.+)$/gm, '<h4 style="font-size:15px;font-weight:600;margin:8px 0;">$1</h4>');
+  html = html.replace(/^[\*\-\+]\s+(.+)$/gm, '<li style="margin:4px 0;">$1</li>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function highlightQuestionInHtml(html) {
+  var blockPatterns = [
+    /^(?:<[^>]+>)*\s*(?:想问|请问|想了解一下|能不能|能不能告诉我|可以问一下|问一下|能不能说说|能不能分享|能不能描述|能不能具体)[\s\S]*?\?\s*(?:<\/[^>]+>)*$/im,
+    /^(?:<[^>]+>)*\s*[^<]*\?\s*(?:<\/[^>]+>)*$/im
+  ];
+  for (var pat of blockPatterns) {
+    var m = html.match(pat);
+    if (m) {
+      var original = m[0];
+      if (!original.includes('highlight-question')) {
+        html = html.replace(original, '<span class="highlight-question">' + original + '</span>');
+        return html;
+      }
+    }
+  }
+  var sentences = html.split(/(<br\s*\/?>|\n)/);
+  for (var i = sentences.length - 1; i >= 0; i--) {
+    if (sentences[i].includes('?') || sentences[i].includes('？')) {
+      if (!sentences[i].includes('highlight-question')) {
+        sentences[i] = '<span class="highlight-question">' + sentences[i] + '</span>';
+        break;
+      }
+    }
+  }
+  return sentences.join('');
+}
+
+function boldLastParagraph(html) {
+  var parts = html.split(/<br\s*\/?>/i);
+  for (var i = parts.length - 1; i >= 0; i--) {
+    var clean = parts[i].replace(/<[^>]+>/g, '').trim();
+    if (clean.length > 0) {
+      if (!parts[i].includes('highlight-question')) {
+        parts[i] = '<span class="bold-last">' + parts[i] + '</span>';
+      }
+      break;
+    }
+  }
+  return parts.join('<br>');
+}
+
+// 诊断卡 - 动态解析AI响应内容
+function switchReplyTab(btn, tabId, version) {
+  // Update tab button styles
+  var parent = btn.parentElement;
+  var buttons = parent.querySelectorAll('button');
+  buttons.forEach(function(b) {
+    b.style.background = '#F1F5F9';
+    b.style.color = '#64748B';
+    b.style.fontWeight = '500';
+  });
+  btn.style.background = '#4338CA';
+  btn.style.color = '#fff';
+  btn.style.fontWeight = '600';
+
+  // Show/hide panels
+  var labels = ['稳妥版', '推进版', '边界版'];
+  for (var i = 0; i < labels.length; i++) {
+    var panel = document.getElementById(tabId + '_' + labels[i]);
+    if (panel) panel.style.display = labels[i] === version ? 'block' : 'none';
+  }
+}
+
+function generateDiagnosis(data) {
+  if (state.diagnosisShown) return;
+  state.diagnosisShown = true;
+
+  var blindSpot, coreMechanism, protection, possibleMeanings, evidenceBasis, riskWarning, suggestedReplies, suggestions;
+
+  // 判断 data 类型：结构化对象（后端 event:diagnosis）或纯文本（兜底）
+  if (typeof data === 'object' && data !== null) {
+    blindSpot = data.blindSpot || '';
+    coreMechanism = data.coreMechanism || '';
+    protection = data.behaviorProtection || '';
+    possibleMeanings = data.possibleMeanings || '';
+    suggestions = data.suggestions || '';
+    evidenceBasis = data.evidenceBasis || '';
+    riskWarning = data.riskWarning || '';
+    suggestedReplies = data.suggestedReplies || '';
+  } else {
+    // 兜底：从纯文本解析
+    var aiText = String(data);
+    function extractSection(label) {
+      var patterns = [
+        new RegExp('\\*\\*' + label + '[：:]?\\*\\*[：:]?\\s*([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*|$)', 'i'),
+        new RegExp(label + '[：:]\\s*([\\s\\S]*?)(?=' + ['家长盲点','核心机制','行为保护','可能含义','判断依据','风险提示','建议回复','改善建议'].join('|') + '|$)', 'i')
+      ];
+      for (var i = 0; i < patterns.length; i++) {
+        var m = aiText.match(patterns[i]);
+        if (m && m[1].trim()) return m[1].trim();
+      }
+      return '';
+    }
+    blindSpot = extractSection('家长盲点');
+    coreMechanism = extractSection('核心机制');
+    protection = extractSection('行为保护');
+    possibleMeanings = extractSection('可能含义');
+    evidenceBasis = extractSection('判断依据');
+    riskWarning = extractSection('风险提示');
+    suggestedReplies = extractSection('建议回复');
+    suggestions = extractSection('改善建议');
+    if (!blindSpot && !coreMechanism) {
+      var lines = aiText.split('\n').filter(function(l) { return l.trim(); });
+      blindSpot = lines.slice(0, 2).join(' ').replace(/\*\*/g, '');
+      coreMechanism = lines.slice(2).join(' ').replace(/\*\*/g, '').substring(0, 200);
+    }
+  }var html = '';
+
+  // 1. 家长盲点
+  if (blindSpot) {
+    html += '<div style="background:linear-gradient(135deg,rgba(47,107,255,0.08),rgba(109,91,208,0.08));border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(47,107,255,0.15);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:linear-gradient(135deg,#2F6BFF,#6D5BD0);color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">家长盲点</span></div>';
+    html += '<div style="font-size:15px;line-height:1.8;color:#0F172A;">' + formatContent(blindSpot) + '</div>';
+    html += '</div>';
+  }
+
+  // 2. 核心机制
+  if (coreMechanism) {
+    html += '<div style="background:rgba(255,255,255,0.9);border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(148,163,184,0.16);box-shadow:0 4px 16px rgba(15,23,42,0.05);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:#EAF2FF;color:#2F6BFF;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">核心机制</span></div>';
+    html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(coreMechanism) + '</div>';
+    html += '</div>';
+  }
+
+  // 3. 行为保护
+  if (protection) {
+    html += '<div style="background:#FFF7ED;border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(249,115,22,0.15);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:#FFEDD5;color:#F97316;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">行为保护</span></div>';
+    html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(protection) + '</div>';
+    html += '</div>';
+  }
+
+  // 4. 可能含义（概率分析）
+  if (possibleMeanings) {
+    html += '<div style="background:rgba(255,255,255,0.9);border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(148,163,184,0.16);box-shadow:0 4px 16px rgba(15,23,42,0.05);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;"><span style="background:#E0E7FF;color:#4338CA;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">可能含义</span></div>';
+
+    // Parse possibleMeanings - could be structured array or raw text
+    var meaningItems = [];
+    if (Array.isArray(possibleMeanings)) {
+      meaningItems = possibleMeanings;
+    } else if (typeof possibleMeanings === 'string') {
+      // Fallback: parse raw text into items
+      var rawText = possibleMeanings;
+      var parts = rawText.split(/\n\s*\d+[\.、）)]\s*/);
+      for (var pi = 0; pi < parts.length; pi++) {
+        var p = parts[pi].trim();
+        if (!p) continue;
+        var pctMatch = p.match(/(\d+)\s*%/);
+        var pct = pctMatch ? parseInt(pctMatch[1]) : 0;
+        // Remove the percentage and leading dash/colon for description
+        var desc = p.replace(/\d+\s*%/, '').replace(/^[—\-–：:\s]+/, '').trim();
+        if (!desc) desc = p;
+        meaningItems.push({label: '', percentage: pct, description: desc});
+      }
+    }
+
+    for (var mi = 0; mi < meaningItems.length; mi++) {
+      var item = meaningItems[mi];
+      var pct = item.percentage || 0;
+      var desc = item.description || '';
+      var label = item.label || '';
+      var displayText = label ? (label + ' — ' + pct + '%：' + desc) : (pct > 0 ? pct + '% ' + desc : desc);
+
+      // Color gradient based on probability
+      var barColor = pct >= 60 ? 'linear-gradient(90deg,#4338CA,#6D5BD0)' :
+                     pct >= 30 ? 'linear-gradient(90deg,#2F6BFF,#60A5FA)' :
+                     'linear-gradient(90deg,#94A3B8,#CBD5E1)';
+      var pctColor = pct >= 60 ? '#4338CA' : pct >= 30 ? '#2F6BFF' : '#64748B';
+
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+      html += '<div style="font-size:14px;color:#334155;line-height:1.6;flex:1;padding-right:8px;">' + formatContent(desc || displayText) + '</div>';
+      html += '<span style="font-size:16px;font-weight:700;color:' + pctColor + ';white-space:nowrap;">' + pct + '%</span>';
+      html += '</div>';
+      html += '<div style="height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;">';
+      html += '<div style="height:100%;width:' + Math.min(pct, 100) + '%;background:' + barColor + ';border-radius:3px;transition:width 0.6s ease;"></div>';
+      html += '</div>';
+      html += '</div>';
+    }
+
+    html += '<div style="font-size:12px;color:#94A3B8;margin-top:8px;">概率基于当前对话，仍存在不确定性</div>';
+    html += '</div>';
+  }
+
+  // 5. 判断依据
+  if (evidenceBasis) {
+    html += '<div style="background:rgba(255,255,255,0.9);border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(148,163,184,0.16);box-shadow:0 4px 16px rgba(15,23,42,0.05);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:#ECFDF5;color:#16A34A;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">判断依据</span></div>';
+    html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(evidenceBasis) + '</div>';
+    html += '</div>';
+  }
+
+  // 6. 风险提示
+  if (riskWarning) {
+    html += '<div style="background:#F1F0FF;border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(109,91,208,0.15);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:#DDD6FE;color:#6D5BD0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">风险提示</span></div>';
+    html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(riskWarning) + '</div>';
+    html += '</div>';
+  }
+
+  // 7. 建议回复
+  if (suggestedReplies) {
+    html += '<div style="background:#F8FAFC;border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(148,163,184,0.16);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:#E2E8F0;color:#475569;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">建议回复</span></div>';
+
+    // 建议回复 Tab 切换 UI（稳妥版/推进版/边界版）
+    var tabId = 'replyTab_' + Date.now();
+    var versions = { '稳妥版': 'conservative', '推进版': 'progressive', '边界版': 'boundary' };
+
+    if (typeof suggestedReplies === 'object' && suggestedReplies !== null && !Array.isArray(suggestedReplies) && (suggestedReplies.conservative || suggestedReplies.progressive || suggestedReplies.boundary)) {
+      // 结构化数据 → Tab UI
+      html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+      var isFirst = true;
+      for (var vn in versions) {
+        var vkey = versions[vn];
+        var vdata = suggestedReplies[vkey];
+        if (!vdata) continue;
+        var btnStyle = isFirst ? 'background:#4338CA;color:#fff;font-weight:600;' : 'background:#F1F5F9;color:#64748B;font-weight:500;';
+        html += '<button onclick="switchReplyTab(this,\'' + tabId + '\',\'' + vn + '\')" style="padding:6px 14px;border-radius:12px;border:none;font-size:12px;cursor:pointer;' + btnStyle + '">' + vn + '</button>';
+        isFirst = false;
+      }
+      html += '</div>';
+
+      for (var vn2 in versions) {
+        var vkey2 = versions[vn2];
+        var vdata2 = suggestedReplies[vkey2];
+        if (!vdata2) continue;
+        var display = (vn2 === '稳妥版') ? 'block' : 'none';
+        html += '<div id="' + tabId + '_' + vn2 + '" style="display:' + display + ';">';
+        if (typeof vdata2 === 'object') {
+          html += '<div style="font-size:14px;line-height:1.8;color:#334155;margin-bottom:8px;">' + formatContent(vdata2.reply || '') + '</div>';
+          if (vdata2.reason) {
+            html += '<div style="font-size:12px;color:#6D5BD0;background:#F1F0FF;padding:8px 12px;border-radius:10px;line-height:1.6;">推荐理由：' + formatContent(vdata2.reason) + '</div>';
+          }
+        } else {
+          html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(String(vdata2)) + '</div>';
+        }
+        html += '</div>';
+      }
+    } else {
+      // 兜底：纯文本渲染
+      html += '<div style="font-size:14px;line-height:1.8;color:#64748B;">' + formatContent(String(suggestedReplies)) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  // 8. 改善建议
+  if (suggestions) {
+    html += '<div style="background:linear-gradient(135deg,rgba(22,163,74,0.06),rgba(47,107,255,0.06));border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(22,163,74,0.12);">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:linear-gradient(135deg,#16A34A,#2F6BFF);color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">改善建议</span></div>';
+    html += '<div style="font-size:14px;line-height:1.8;color:#334155;">' + formatContent(suggestions) + '</div>';
+    html += '</div>';
+  }
+
+  // 9. 免责声明
+  html += '<div style="font-size:12px;color:#94A3B8;text-align:center;margin-bottom:16px;line-height:1.6;">以上分析基于当前对话信息的可能性推演<br>不是心理诊断结论，仅供参考</div>';
+
+  // 10. 继续对话按钮
+  html += '<button onclick="closeDiagnosisModal()" style="width:100%;padding:14px;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);color:#fff;border:none;border-radius:16px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 10px 20px rgba(47,107,255,0.25);margin-bottom:16px;">继续对话，深入探讨</button>';
+
+  // 11. 伴学服务卡片
+  html += '<div style="background:linear-gradient(135deg,rgba(109,91,208,0.08),rgba(47,107,255,0.08));border-radius:20px;padding:20px;margin-bottom:16px;border:1px solid rgba(109,91,208,0.15);">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="background:linear-gradient(135deg,#6D5BD0,#2F6BFF);color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">\u{1F3C6} 专属服务</span></div>';
+  html += '<div style="font-size:16px;font-weight:600;color:#0F172A;margin-bottom:6px;">清华北大学霸诊断伴学</div>';
+  html += '<div style="font-size:13px;color:#64748B;margin-bottom:12px;">基于本次诊断结果，为你匹配专属学霸，提供定制化伴学方案</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;"><span style="background:#F1F0FF;color:#6D5BD0;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;border:1px solid #DDD6FE;">\u{1F393} 清华大学</span><span style="background:#FEF2F2;color:#B91C1C;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;border:1px solid #FECACA;">\u{1F393} 北京大学</span></div>';
+  html += '<div onclick="showSubpage(\'tutorDetailPage\')" style="text-align:center;padding:10px;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);color:#fff;border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;">查看专属伴学方案 \u203A</div>';
+  html += '</div>';
+
+  // 12. 预约表单
+  html += '<div style="padding:20px;background:#F8FAFC;border-radius:20px;border:1px solid rgba(148,163,184,0.12);">';
+  html += '<div style="font-size:14px;color:#0F172A;font-weight:600;margin-bottom:14px;">预约诊断跟进</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+  html += '<input type="tel" placeholder="您的手机号" id="tutorPhone" style="padding:12px;border:1px solid #E5E7EB;border-radius:14px;font-size:15px;width:100%;box-sizing:border-box;background:#fff;">';
+  html += '<input type="text" placeholder="孩子姓名/昵称" id="tutorChildName" style="padding:12px;border:1px solid #E5E7EB;border-radius:14px;font-size:15px;width:100%;box-sizing:border-box;background:#fff;">';
+  html += '<select id="tutorGrade" style="padding:12px;border:1px solid #E5E7EB;border-radius:14px;font-size:15px;width:100%;box-sizing:border-box;background:#fff;">';
+  html += '<option value="">孩子年级（可选）</option>';
+  ['一年级','二年级','三年级','四年级','五年级','六年级','七年级','八年级','九年级','高一','高二','高三'].forEach(function(g) { html += '<option value="' + g + '">' + g + '</option>'; });
+  html += '</select>';
+  html += '<button onclick="submitTutorInfo()" style="padding:14px;background:linear-gradient(135deg,#6D5BD0,#4F46A5);color:#fff;border:none;border-radius:16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;">提交预约</button>';
+  html += '</div></div>';
+
+  var content = document.getElementById('diagnosisContent');
+  content.innerHTML = html;
+
+  var modal = document.getElementById('diagnosisModal');
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  }
+
+function closeDiagnosisModal() {
+  document.getElementById('diagnosisModal').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function submitTutorInfo() {
+  var phone = document.getElementById('tutorPhone').value.trim();
+  var childName = document.getElementById('childName').value.trim();
+  var childGrade = document.getElementById('childGrade').value.trim();
+  
+  if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
+    alert('请输入正确的手机号');
+    return;
+  }
+  if (!childName || !childGrade) {
+    alert('请填写孩子姓名和年级');
+    return;
+  }
+  
+  var info = {
+    phone: phone,
+    childName: childName,
+    childGrade: childGrade,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem('tutor_booking_' + Date.now(), JSON.stringify(info));
+  
+  alert('预约成功！稍后会有清北学姐联系您~');
+  closeDiagnosisModal();
+}
+
+// 诊断卡弹窗下滑关闭手势
+(function setupSwipeClose() {
+  var panel = document.querySelector('.modal-panel');
+  var handle = document.getElementById('modalDragHandle');
+  if (!panel || !handle) return;
+
+  var startY = 0;
+  var startX = 0;
+  var currentY = 0;
+  var isDragging = false;
+
+  handle.addEventListener('touchstart', (e) => {
+    var t = e.touches[0];
+    startY = t.clientY;
+    startX = t.clientX;
+    currentY = 0;
+    isDragging = true;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  handle.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    var t = e.touches[0];
+    var dy = t.clientY - startY;
+    var dx = t.clientX - startX;
+    if (dy > 0 && dy > Math.abs(dx)) {
+      currentY = dy;
+      panel.style.transform = 'translateY(' + dy + 'px)';
+    }
+  }, { passive: true });
+
+  handle.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    panel.style.transition = 'transform 0.25s ease';
+    if (currentY > 80) {
+      closeDiagnosisModal();
+      setTimeout(() => { panel.style.transform = ''; }, 300);
+    } else {
+      panel.style.transform = 'translateY(0)';
+      setTimeout(() => { panel.style.transform = ''; panel.style.transition = ''; }, 300);
+    }
+  });
+})();
+
+// 子页面
+function showSubpage(id) {
+  document.getElementById(id).classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function hideSubpage(id) {
+  document.getElementById(id).classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// 分享
+function showShare() {
+  document.getElementById('shareUrlBox').textContent = window.location.href;
+  document.getElementById('shareOverlay').classList.add('active');
+}
+function hideShare() {
+  document.getElementById('shareOverlay').classList.remove('active');
+}
+function copyShareUrl() {
+  var url = document.getElementById('shareUrlBox').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    alert('链接已复制，快去分享给朋友吧！');
+    hideShare();
+  });
+}
+
+// 长按菜单
+function showLongPressMenu(e, row) {
+  state.currentLongPressMsg = row;
+  var menu = document.getElementById('longpressMenu');
+  var x = e.clientX || (e.touches && e.touches[0].clientX) || 100;
+  var y = e.clientY || (e.touches && e.touches[0].clientY) || 100;
+  menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
+  menu.classList.add('active');
+}
+function hideLongPressMenu() {
+  document.getElementById('longpressMenu').classList.remove('active');
+}
+function copySelectedMessage() {
+  if (state.currentLongPressMsg) {
+    var text = state.currentLongPressMsg.dataset.raw || '';
+    navigator.clipboard.writeText(text).then(() => alert('已复制'));
+  }
+  hideLongPressMenu();
+}
+function deleteSelectedMessage() {
+  if (state.currentLongPressMsg) {
+    state.currentLongPressMsg.remove();
+  }
+  hideLongPressMenu();
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.longpress-menu')) hideLongPressMenu();
+});
+
+// ===== 网络层增强：保活 + 重连 + 重试 =====
+
+// 1. API 调用自动重试
+function fetchWithRetry(url, options, maxRetries) {
+  return fetch(url, options).catch(function(err) {
+    if (maxRetries > 0) {
+      return new Promise(function(resolve) {
+        setTimeout(function() {
+          resolve(fetchWithRetry(url, options, maxRetries - 1));
+        }, 2000);
+      });
+    }
+    throw err;
+  });
+}
+
+// 2. 心跳保活：每2分钟发一次轻量请求，保持实例活跃
+(function startHeartbeat() {
+  var HEARTBEAT_INTERVAL = 120000;
+  setInterval(function() {
+    fetch(API_BASE + '/', { method: 'GET', cache: 'no-store' }).catch(function(){});
+  }, HEARTBEAT_INTERVAL);
+})();
+
+// 3. 自动重连：检测到 instance_not_found 时自动刷新重试
+(function setupAutoReconnect() {
+  var MAX_RETRIES = 3;
+  var retryCount = parseInt(sessionStorage.getItem('coze_retry_count') || '0');
+
+  function showReconnecting(msg) {
+    var overlay = document.getElementById('reconnectOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'reconnectOverlay';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.92);';
+      overlay.innerHTML = '<div style="text-align:center;padding:24px;"><div style="width:32px;height:32px;border:3px solid #10B981;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px;"></div><p style="color:#333;font-size:15px;margin:0;">' + (msg || '服务正在唤醒，自动重试中...') + '</p></div>';
+      document.body.appendChild(overlay);
+    }
+  }
+
+  function hideReconnecting() {
+    var overlay = document.getElementById('reconnectOverlay');
+    if (overlay) overlay.remove();
+  }
+
+  function checkConnection() {
+    return fetch(API_BASE + '/', { method: 'GET', cache: 'no-store' })
+      .then(function(resp) {
+        if (resp.status === 404) {
+          throw new Error('instance_not_found');
+        }
+        return resp;
+      })
+      .then(function() {
+        sessionStorage.removeItem('coze_retry_count');
+        hideReconnecting();
+        return true;
+      })
+      .catch(function(err) {
+        if (retryCount >= MAX_RETRIES) {
+          sessionStorage.removeItem('coze_retry_count');
+          hideReconnecting();
+          return false;
+        }
+        retryCount++;
+        sessionStorage.setItem('coze_retry_count', retryCount);
+        var delay = Math.pow(2, retryCount) * 1000;
+        showReconnecting();
+        setTimeout(function() {
+          window.location.reload();
+        }, delay);
+        return false;
+      });
+  }
+
+  // 页面加载时检查连接
+  checkConnection();
+
+  // 4. 窗口重新获得焦点时检查连接
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      checkConnection();
+    }
+  });
+
+  // 暴露给全局，callAPI catch 块也可用
+  window._checkConnection = checkConnection;
+  window._showReconnecting = showReconnecting;
+  window._hideReconnecting = hideReconnecting;
+})();
+
+// 5. 添加旋转动画样式
+var spinStyle = document.createElement('style');
+spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+document.head.appendChild(spinStyle);
+
+
+// ===== 侧边栏功能 =====
+function toggleSidebar(show) {
+  var overlay = document.getElementById('sidebarOverlay');
+  var sidebar = document.getElementById('sidebar');
+  if (show) {
+    overlay.classList.add('active');
+    sidebar.classList.add('active');
+  } else {
+    overlay.classList.remove('active');
+    sidebar.classList.remove('active');
+  }
+}
+
+function openPage(pageId) {
+  toggleSidebar(false);
+  document.getElementById(pageId).classList.add('active');
+}
+
+function closePage(pageId) {
+  document.getElementById(pageId).classList.remove('active');
+}
+
+</script>
+
+  <!-- 侧边栏遮罩 -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
+  
+  <!-- 侧边栏 -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">对话实验室</div>
+      <div class="sidebar-subtitle">清北学霸陪你聊教育</div>
+    </div>
+    <div class="sidebar-menu">
+      <div class="menu-item" onclick="openPage('communityPage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="#7C5CFC"/></svg>
+        <span class="menu-text">清北社区</span>
+      </div>
+      <div class="menu-item" onclick="openPage('qaPage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z" fill="#10B981"/></svg>
+        <span class="menu-text">名校直答</span>
+      </div>
+      <div class="menu-item" onclick="openPage('characterPage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#F59E0B"/></svg>
+        <span class="menu-text">孩子人物</span>
+      </div>
+      <div class="menu-item" onclick="openPage('englishPage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z" fill="#3B82F6"/></svg>
+        <span class="menu-text">英语角</span>
+      </div>
+      <div class="menu-item" onclick="openPage('schedulePage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="#EF4444"/></svg>
+        <span class="menu-text">个性化课表</span>
+      </div>
+      <div class="menu-item" onclick="openPage('examPage')">
+        <svg class="menu-icon" viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z" fill="#8B5CF6"/></svg>
+        <span class="menu-text">一键分析试卷</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清北社区页面 -->
+  <div class="page-container" id="communityPage">
+    <div style="background:#FFFFFF;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:10;">
+      <div style="display:flex;align-items:center;margin-bottom:12px;">
+        <div onclick="closePage('communityPage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#64748B;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#0F172A;flex:1;">清北社区</div>
+        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+          <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#64748B;"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:4px;">
+        <div style="font-size:14px;font-weight:600;color:#2F6BFF;border-bottom:2px solid #2F6BFF;padding-bottom:8px;white-space:nowrap;">推荐</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">清华大学</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">北京大学</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">学习方法</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">经验分享</div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:0;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- 搜索框 -->
+      <div style="padding:12px 16px;background:#FFFFFF;">
+        <div style="display:flex;align-items:center;gap:10px;background:#F8FAFC;padding:10px 14px;border-radius:10px;border:1px solid #F1F5F9;">
+          <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#94A3B8;flex-shrink:0;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" placeholder="搜索学习方法、学长学姐" style="flex:1;border:none;background:transparent;font-size:14px;color:#0F172A;outline:none;">
+        </div>
+      </div>
+      
+      <!-- 推荐关注 - 横向人物 -->
+      <div style="padding:16px;background:#FFFFFF;border-bottom:8px solid #F8FAFC;">
+        <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:12px;">推荐关注</div>
+        <div style="display:flex;gap:12px;overflow-x:auto;">
+          <div style="text-align:center;min-width:72px;flex-shrink:0;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;margin:0 auto 6px;">L</div>
+            <div style="font-size:12px;font-weight:600;color:#0F172A;">Lily</div>
+            <div style="font-size:11px;color:#64748B;">清华大学</div>
+          </div>
+          <div style="text-align:center;min-width:72px;flex-shrink:0;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#B91C1C,#DC2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;margin:0 auto 6px;">K</div>
+            <div style="font-size:12px;font-weight:600;color:#0F172A;">Kevin</div>
+            <div style="font-size:11px;color:#64748B;">北京大学</div>
+          </div>
+          <div style="text-align:center;min-width:72px;flex-shrink:0;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#F5B84B,#F97316);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;margin:0 auto 6px;">V</div>
+            <div style="font-size:12px;font-weight:600;color:#0F172A;">Vivian</div>
+            <div style="font-size:11px;color:#64748B;">清华大学</div>
+          </div>
+          <div style="text-align:center;min-width:72px;flex-shrink:0;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#16A34A,#22C55E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;margin:0 auto 6px;">M</div>
+            <div style="font-size:12px;font-weight:600;color:#0F172A;">Mike</div>
+            <div style="font-size:11px;color:#64748B;">北京大学</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 信息流列表 -->
+      <div style="background:#FFFFFF;">
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;">L</div>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#0F172A;">清华学姐 Lily</div>
+              <div style="font-size:12px;color:#64748B;">清华大学 · 计算机系</div>
+            </div>
+            <div style="margin-left:auto;">
+              <span style="padding:3px 8px;border-radius:4px;background:#F1F0FF;color:#6D5BD0;font-size:11px;font-weight:500;">清华</span>
+            </div>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">清华学姐的错题本四层法：不是抄题，而是建立知识网络</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">很多人做错题本就是在抄题，真正有用的是分析错误原因，把孤立的知识点连成网络...</div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#EF4444;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span style="font-size:13px;color:#64748B;">8.9k</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></svg>
+              <span style="font-size:13px;color:#64748B;">342</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+              <span style="font-size:13px;color:#64748B;">收藏</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#B91C1C,#DC2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;">K</div>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#0F172A;">北大学长 Kevin</div>
+              <div style="font-size:12px;color:#64748B;">北京大学 · 中文系</div>
+            </div>
+            <div style="margin-left:auto;">
+              <span style="padding:3px 8px;border-radius:4px;background:#FEF2F2;color:#B91C1C;font-size:11px;font-weight:500;">北大</span>
+            </div>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">北大学长的英语阅读拆句训练：长难句不再难</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">用拆分长难句的方法提升阅读速度和准确率，这是我从高考英语145分的经验总结...</div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#EF4444;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span style="font-size:13px;color:#64748B;">6.5k</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></svg>
+              <span style="font-size:13px;color:#64748B;">256</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+              <span style="font-size:13px;color:#64748B;">收藏</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#F5B84B,#F97316);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;">V</div>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#0F172A;">清华学姐 Vivian</div>
+              <div style="font-size:12px;color:#64748B;">清华大学 · 经济系</div>
+            </div>
+            <div style="margin-left:auto;">
+              <span style="padding:3px 8px;border-radius:4px;background:#F1F0FF;color:#6D5BD0;font-size:11px;font-weight:500;">清华</span>
+            </div>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">高三后期如何稳定心态：过来人的3个建议</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">考前压力管理技巧，帮你保持最佳状态，这些方法帮我度过了最艰难的高三时光...</div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#EF4444;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span style="font-size:13px;color:#64748B;">5.2k</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></svg>
+              <span style="font-size:13px;color:#64748B;">189</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#94A3B8;"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+              <span style="font-size:13px;color:#64748B;">收藏</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 底部悬浮按钮 -->
+    <div style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom, 0px));right:16px;z-index:100;">
+      <button style="display:flex;align-items:center;gap:6px;height:44px;padding:0 18px;border-radius:22px;background:#2F6BFF;color:#FFFFFF;font-size:14px;font-weight:600;border:none;box-shadow:0 4px 12px rgba(47,107,255,0.25);">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#FFFFFF;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        写分享
+      </button>
+    </div>
+  </div>
+
+  <!-- 名校直答页面 -->
+  <div class="page-container" id="qaPage">
+    <div style="background:#FFFFFF;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:10;">
+      <div style="display:flex;align-items:center;margin-bottom:12px;">
+        <div onclick="closePage('qaPage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#64748B;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#0F172A;flex:1;">名校直答</div>
+        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+          <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#64748B;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:4px;">
+        <div style="font-size:14px;font-weight:600;color:#2F6BFF;border-bottom:2px solid #2F6BFF;padding-bottom:8px;white-space:nowrap;">推荐</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">最新</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">高赞</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">学习方法</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">志愿填报</div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:0;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- 搜索框 -->
+      <div style="padding:12px 16px;background:#FFFFFF;">
+        <div style="display:flex;align-items:center;gap:10px;background:#F8FAFC;padding:10px 14px;border-radius:10px;border:1px solid #F1F5F9;">
+          <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#94A3B8;flex-shrink:0;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" placeholder="搜索你关心的问题" style="flex:1;border:none;background:transparent;font-size:14px;color:#0F172A;outline:none;">
+        </div>
+      </div>
+      
+      <!-- 问题列表 -->
+      <div style="background:#FFFFFF;">
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#EF4444;font-size:11px;font-weight:500;">热门</span>
+            <span style="font-size:12px;color:#94A3B8;">328 关注</span>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">高一成绩一般，还有必要冲清北吗？</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">我现在成绩中等偏下，目标清北是不是太不现实了？怎样规划才有希望？</div>
+          <div style="display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid #F1F5F9;">
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">L</div>
+            <span style="font-size:13px;color:#334155;">清华学姐 Lily</span>
+            <span style="padding:2px 6px;border-radius:3px;background:#F1F0FF;color:#6D5BD0;font-size:11px;">清华</span>
+            <span style="margin-left:auto;font-size:12px;color:#94A3B8;">186 赞同 · 32 评论</span>
+          </div>
+        </div>
+        
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FFF7ED;color:#F97316;font-size:11px;font-weight:500;">新帖</span>
+            <span style="font-size:12px;color:#94A3B8;">256 关注</span>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">如何平衡竞赛和课内学习？</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">想打竞赛但怕影响学校成绩，有没有学长学姐分享一下时间分配经验？</div>
+          <div style="display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid #F1F5F9;">
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#B91C1C,#DC2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">K</div>
+            <span style="font-size:13px;color:#334155;">北大学长 Kevin</span>
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#B91C1C;font-size:11px;">北大</span>
+            <span style="margin-left:auto;font-size:12px;color:#94A3B8;">142 赞同 · 28 评论</span>
+          </div>
+        </div>
+        
+        <div style="padding:16px;border-bottom:1px solid #F1F5F9;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="padding:2px 6px;border-radius:3px;background:#FEF2F2;color:#EF4444;font-size:11px;font-weight:500;">热门</span>
+            <span style="font-size:12px;color:#94A3B8;">198 关注</span>
+          </div>
+          <div style="font-size:16px;font-weight:600;color:#0F172A;line-height:1.5;margin-bottom:8px;">文科生如何提升逻辑思维？</div>
+          <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:12px;">感觉自己逻辑混乱，写议论文总是没条理，有什么训练方法吗？</div>
+          <div style="display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid #F1F5F9;">
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F5B84B,#F97316);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">V</div>
+            <span style="font-size:13px;color:#334155;">清华学姐 Vivian</span>
+            <span style="padding:2px 6px;border-radius:3px;background:#F1F0FF;color:#6D5BD0;font-size:11px;">清华</span>
+            <span style="margin-left:auto;font-size:12px;color:#94A3B8;">98 赞同 · 18 评论</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 底部悬浮按钮 -->
+    <div style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom, 0px));right:16px;z-index:100;">
+      <button style="display:flex;align-items:center;gap:6px;height:44px;padding:0 18px;border-radius:22px;background:#2F6BFF;color:#FFFFFF;font-size:14px;font-weight:600;border:none;box-shadow:0 4px 12px rgba(47,107,255,0.25);">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#FFFFFF;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        我要提问
+      </button>
+    </div>
+  </div>
+
+  <!-- 孩子人物页面 -->
+  <div class="page-container" id="characterPage">
+    <div style="background:linear-gradient(135deg,#2F6BFF 0%,#6D5BD0 100%);padding:16px;padding-top:calc(16px + env(safe-area-inset-top, 0px));position:relative;overflow:hidden;border-radius:0 0 20px 20px;">
+      <div style="position:absolute;top:-40px;right:-30px;width:140px;height:140px;background:rgba(255,255,255,0.06);border-radius:50%;"></div>
+      <div style="display:flex;align-items:center;margin-bottom:20px;">
+        <div onclick="closePage('characterPage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#FFFFFF;opacity:0.9;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#FFFFFF;flex:1;text-align:center;margin-right:32px;">孩子人物</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#F5B84B,#F97316);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:700;margin:0 auto 10px;border:3px solid rgba(255,255,255,0.3);">明</div>
+        <div style="font-size:18px;font-weight:600;color:#FFFFFF;margin-bottom:4px;">小明</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.8);margin-bottom:12px;">12岁 · 初一</div>
+        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+          <span style="padding:4px 10px;border-radius:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:#FFFFFF;font-size:12px;">理性独立</span>
+          <span style="padding:4px 10px;border-radius:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:#FFFFFF;font-size:12px;">求知欲强</span>
+          <span style="padding:4px 10px;border-radius:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:#FFFFFF;font-size:12px;">自我要求高</span>
+        </div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:16px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:12px;">亲子关系洞察</div>
+      
+      <div style="background:#F0FDF4;border-radius:12px;padding:14px;margin-bottom:10px;border-left:3px solid #16A34A;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#16A34A;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#FFFFFF;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+          <span style="font-size:14px;font-weight:600;color:#16A34A;">优势</span>
+        </div>
+        <div style="font-size:13px;color:#334155;line-height:1.7;padding-left:32px;">
+          <div>· 思维敏捷，喜欢探索新知识</div>
+          <div>· 有自己的想法，不盲从</div>
+          <div>· 对感兴趣任务投入度高</div>
+        </div>
+      </div>
+      
+      <div style="background:#FFFBEB;border-radius:12px;padding:14px;margin-bottom:16px;border-left:3px solid #F59E0B;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#F59E0B;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#FFFFFF;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          </div>
+          <span style="font-size:14px;font-weight:600;color:#D97706;">注意</span>
+        </div>
+        <div style="font-size:13px;color:#334155;line-height:1.7;padding-left:32px;">
+          <div>· 遇到压力时容易先沉默</div>
+          <div>· 对比较和否定比较敏感</div>
+          <div>· 需要更多可控的小成功</div>
+        </div>
+      </div>
+      
+      <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:12px;">个性化教育建议</div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#2F6BFF;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">多鼓励过程而非结果</div>
+            <div style="font-size:12px;color:#64748B;">关注努力和方法，而不只是分数</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:#F5F3FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#6D5BD0;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">给他选择权</div>
+            <div style="font-size:12px;color:#64748B;">在合理范围内让孩子自己决定</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#16A34A;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">建立低压力表达通道</div>
+            <div style="font-size:12px;color:#64748B;">创造安全空间让孩子说出想法</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:#FFFBEB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#F59E0B;"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">每天留10分钟非学习交流</div>
+            <div style="font-size:12px;color:#64748B;">不谈学习，只聊生活和兴趣</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:linear-gradient(135deg,#EFF6FF 0%,#F5F3FF 100%);border-radius:12px;padding:16px;margin-bottom:40px;">
+        <div style="font-size:14px;font-weight:600;color:#0F172A;margin-bottom:8px;">当前更值得关注</div>
+        <div style="font-size:13px;color:#334155;line-height:1.7;margin-bottom:12px;">孩子不是单纯不努力，更像是在压力任务前需要一个缓冲入口。建议先降低开口压力，再进入任务安排。</div>
+        <button style="width:100%;height:40px;border-radius:10px;background:#2F6BFF;color:#FFFFFF;font-size:14px;font-weight:600;border:none;">生成孩子理解分析卡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 英语角页面 -->
+  <div class="page-container" id="englishPage">
+    <div style="background:#FFFFFF;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:10;">
+      <div style="display:flex;align-items:center;">
+        <div onclick="closePage('englishPage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#64748B;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#0F172A;flex:1;">英语角</div>
+        <div style="padding:4px 10px;border-radius:12px;background:#FEF3C7;color:#D97706;font-size:12px;font-weight:600;">Lv.3</div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:16px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- 数据统计卡 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #F1F5F9;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">5/7</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">本周目标</div>
+          </div>
+          <div style="width:1px;background:#F1F5F9;"></div>
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">28</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">累计天数</div>
+          </div>
+          <div style="width:1px;background:#F1F5F9;"></div>
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">368</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">累计词汇</div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748B;margin-bottom:4px;">
+            <span>本周进度</span>
+            <span>71%</span>
+          </div>
+          <div style="height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:71%;background:linear-gradient(90deg,#2F6BFF,#6D5BD0);border-radius:3px;"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 连续打卡 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #F1F5F9;">
+        <div style="font-size:14px;font-weight:600;color:#0F172A;margin-bottom:12px;">连续打卡 6 天</div>
+        <div style="display:flex;justify-content:space-between;">
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">一</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">二</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">三</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">四</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">五</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">六</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:#2F6BFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin:0 auto;">✓</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">日</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto;border:2px solid #2F6BFF;">今</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 今日单词 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #F1F5F9;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:14px;font-weight:600;color:#0F172A;">今日单词</span>
+          <span style="font-size:13px;color:#2F6BFF;font-weight:500;">换一批</span>
+        </div>
+        <div style="text-align:center;padding:16px 0;">
+          <div style="font-size:28px;font-weight:700;color:#0F172A;margin-bottom:4px;">perseverance</div>
+          <div style="font-size:14px;color:#64748B;margin-bottom:6px;">/ˌpɜːrsəˈvɪrəns/</div>
+          <div style="font-size:15px;color:#334155;margin-bottom:10px;">n. 毅力，坚持</div>
+          <div style="background:#F8FAFC;padding:10px 14px;border-radius:8px;margin-bottom:10px;">
+            <div style="font-size:14px;color:#0F172A;font-style:italic;">"Success comes from perseverance."</div>
+            <div style="font-size:13px;color:#64748B;margin-top:4px;">成功来自于坚持。</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button style="flex:1;height:36px;border-radius:8px;background:#F8FAFC;border:1px solid #F1F5F9;color:#64748B;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:4px;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#64748B;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            收藏
+          </button>
+          <button style="flex:1;height:36px;border-radius:8px;background:#F8FAFC;border:1px solid #F1F5F9;color:#64748B;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:4px;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#64748B;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            发音
+          </button>
+        </div>
+      </div>
+      
+      <!-- 开始学习按钮 -->
+      <button style="width:100%;height:48px;border-radius:12px;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);color:#FFFFFF;font-size:15px;font-weight:600;border:none;margin-bottom:12px;box-shadow:0 4px 12px rgba(47,107,255,0.2);display:flex;align-items:center;justify-content:center;gap:8px;">
+        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#FFFFFF;"><path d="M8 5v14l11-7z"/></svg>
+        开始学习 · 20分钟
+      </button>
+      
+      <!-- 今日建议 -->
+      <div style="background:#EFF6FF;border-radius:12px;padding:14px;margin-bottom:40px;">
+        <div style="font-size:13px;font-weight:600;color:#1D4ED8;margin-bottom:4px;">今日建议</div>
+        <div style="font-size:13px;color:#334155;line-height:1.6;">今天适合做 1 组阅读拆句训练，不求多，重点是读懂句子结构。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 个性化课表页面 -->
+  <div class="page-container" id="schedulePage">
+    <div style="background:#FFFFFF;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:10;">
+      <div style="display:flex;align-items:center;margin-bottom:12px;">
+        <div onclick="closePage('schedulePage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#64748B;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#0F172A;flex:1;">个性化课表</div>
+        <div style="font-size:14px;color:#64748B;">今天</div>
+      </div>
+      <div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:4px;">
+        <div style="font-size:14px;font-weight:600;color:#2F6BFF;border-bottom:2px solid #2F6BFF;padding-bottom:8px;white-space:nowrap;">今日</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">周一</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">周二</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">周三</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">周四</div>
+        <div style="font-size:14px;font-weight:500;color:#64748B;padding-bottom:8px;white-space:nowrap;">周五</div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:16px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- AI一键生成 -->
+      <div style="background:linear-gradient(135deg,#EFF6FF 0%,#F5F3FF 100%);border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #E0E7FF;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#2F6BFF,#6D5BD0);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#FFFFFF;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:#0F172A;">AI 一键生成课表</div>
+            <div style="font-size:13px;color:#64748B;">根据画像和学习任务智能规划</div>
+          </div>
+        </div>
+        <button style="width:100%;height:40px;border-radius:10px;background:#2F6BFF;color:#FFFFFF;font-size:14px;font-weight:600;border:none;">AI 一键生成</button>
+      </div>
+      
+      <!-- 输入框 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:12px;margin-bottom:16px;border:1px solid #F1F5F9;">
+        <div style="display:flex;gap:8px;">
+          <input type="text" placeholder="输入今天必须完成的任务" style="flex:1;height:40px;border-radius:8px;background:#F8FAFC;border:1px solid #F1F5F9;padding:0 12px;font-size:14px;color:#0F172A;outline:none;">
+          <button style="height:40px;padding:0 16px;border-radius:8px;background:#EFF6FF;border:1px solid #BFDBFE;color:#2F6BFF;font-size:14px;font-weight:600;white-space:nowrap;">添加</button>
+        </div>
+      </div>
+      
+      <!-- 时间轴 -->
+      <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:12px;">今日安排</div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">07:00</div>
+          <div style="font-size:11px;color:#94A3B8;">07:30</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#2F6BFF;"></div>
+          <div style="width:1px;flex:1;background:#E2E8F0;"></div>
+        </div>
+        <div style="flex:1;background:#F0FDF4;border-radius:10px;padding:12px;border:1px solid #DCFCE7;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">早读 · 英语单词</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">背诵今日单词列表</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">09:00</div>
+          <div style="font-size:11px;color:#94A3B8;">10:30</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#CBD5E1;"></div>
+          <div style="width:1px;flex:1;background:#E2E8F0;"></div>
+        </div>
+        <div style="flex:1;background:#EFF6FF;border-radius:10px;padding:12px;border:1px solid #DBEAFE;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">数学 · 函数专项</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">完成课后习题 1-10</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">10:40</div>
+          <div style="font-size:11px;color:#94A3B8;">11:40</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#CBD5E1;"></div>
+          <div style="width:1px;flex:1;background:#E2E8F0;"></div>
+        </div>
+        <div style="flex:1;background:#F5F3FF;border-radius:10px;padding:12px;border:1px solid #EDE9FE;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">物理 · 力学实验</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">实验报告准备</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">14:30</div>
+          <div style="font-size:11px;color:#94A3B8;">16:00</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#CBD5E1;"></div>
+          <div style="width:1px;flex:1;background:#E2E8F0;"></div>
+        </div>
+        <div style="flex:1;background:#FFFBEB;border-radius:10px;padding:12px;border:1px solid #FEF3C7;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">化学 · 方程式配平</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">练习册 P32-35</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">19:00</div>
+          <div style="font-size:11px;color:#94A3B8;">20:30</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#CBD5E1;"></div>
+          <div style="width:1px;flex:1;background:#E2E8F0;"></div>
+        </div>
+        <div style="flex:1;background:#EFF6FF;border-radius:10px;padding:12px;border:1px solid #DBEAFE;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">英语 · 阅读理解</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">拆句训练 2 篇</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="width:60px;text-align:right;flex-shrink:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;">21:00</div>
+          <div style="font-size:11px;color:#94A3B8;">21:30</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#16A34A;"></div>
+        </div>
+        <div style="flex:1;background:#FEF3C7;border-radius:10px;padding:12px;border:1px solid #FDE68A;">
+          <div style="font-size:14px;font-weight:500;color:#0F172A;">复盘 · 今日总结</div>
+          <div style="font-size:12px;color:#64748B;margin-top:2px;">15分钟，回顾今日收获</div>
+        </div>
+      </div>
+      
+      <!-- 今日建议 -->
+      <div style="background:#EFF6FF;border-radius:12px;padding:14px;margin-bottom:40px;">
+        <div style="font-size:13px;font-weight:600;color:#1D4ED8;margin-bottom:4px;">今日建议</div>
+        <div style="font-size:13px;color:#334155;line-height:1.6;">建议先完成确定性较高的任务，再进入难题区。晚间复盘不要超过 15 分钟，避免形成压力堆积。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 一键分析试卷页面 -->
+  <div class="page-container" id="examPage">
+    <div style="background:#FFFFFF;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:10;">
+      <div style="display:flex;align-items:center;">
+        <div onclick="closePage('examPage')" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#64748B;"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:#0F172A;flex:1;">一键分析试卷</div>
+        <div style="font-size:13px;color:#64748B;">使用说明</div>
+      </div>
+    </div>
+    <div class="page-content" style="padding:16px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- 上传区域 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:32px 24px;text-align:center;margin-bottom:16px;border:2px dashed #BFDBFE;">
+        <div style="width:48px;height:48px;border-radius:12px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+          <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#2F6BFF;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+        </div>
+        <div style="font-size:16px;font-weight:600;color:#0F172A;margin-bottom:6px;">点击或拖拽上传试卷</div>
+        <div style="font-size:13px;color:#64748B;margin-bottom:20px;">支持图片 / PDF，单次最多 10 页</div>
+        <button style="height:40px;padding:0 24px;border-radius:10px;background:#2F6BFF;color:#FFFFFF;font-size:14px;font-weight:600;border:none;">上传试卷</button>
+      </div>
+      
+      <!-- 历史记录 -->
+      <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:12px;">历史分析记录</div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:8px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#2F6BFF;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">高二数学月考卷.pdf</div>
+            <div style="font-size:12px;color:#94A3B8;">2024-01-15</div>
+          </div>
+          <span style="padding:3px 8px;border-radius:4px;background:#F0FDF4;color:#16A34A;font-size:11px;font-weight:500;">分析完成</span>
+        </div>
+      </div>
+      
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid #F1F5F9;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:8px;background:#F5F3FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#6D5BD0;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:500;color:#0F172A;">高三英语期中卷.pdf</div>
+            <div style="font-size:12px;color:#94A3B8;">2024-01-10</div>
+          </div>
+          <span style="padding:3px 8px;border-radius:4px;background:#EFF6FF;color:#2F6BFF;font-size:11px;font-weight:500;">分析中</span>
+        </div>
+      </div>
+      
+      <!-- AI分析预览 -->
+      <div style="background:#FFFFFF;border-radius:12px;padding:16px;margin-bottom:40px;border:1px solid #F1F5F9;">
+        <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:4px;">AI 分析预览</div>
+        <div style="font-size:13px;color:#64748B;margin-bottom:16px;">高二数学月考卷.pdf</div>
+        
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <div style="flex:1;text-align:center;padding:12px;background:#F8FAFC;border-radius:10px;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">150</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">总分</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:12px;background:#F8FAFC;border-radius:10px;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">112</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">得分</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:12px;background:#F8FAFC;border-radius:10px;">
+            <div style="font-size:20px;font-weight:700;color:#0F172A;">74.7%</div>
+            <div style="font-size:12px;color:#64748B;margin-top:2px;">得分率</div>
+          </div>
+        </div>
+        
+        <div style="font-size:14px;font-weight:600;color:#0F172A;margin-bottom:10px;">发现的关键问题</div>
+        <div style="background:#EFF6FF;padding:10px 12px;border-radius:8px;margin-bottom:8px;">
+          <div style="font-size:13px;color:#1D4ED8;line-height:1.5;">1. 基础题得分率高，说明概念掌握较好</div>
+        </div>
+        <div style="background:#EFF6FF;padding:10px 12px;border-radius:8px;margin-bottom:8px;">
+          <div style="font-size:13px;color:#1D4ED8;line-height:1.5;">2. 压轴题失分集中，思路不够稳定</div>
+        </div>
+        <div style="background:#EFF6FF;padding:10px 12px;border-radius:8px;margin-bottom:16px;">
+          <div style="font-size:13px;color:#1D4ED8;line-height:1.5;">3. 计算错误偏多，需要建立检查习惯</div>
+        </div>
+        
+        <button style="width:100%;height:44px;border-radius:10px;background:#2F6BFF;color:#FFFFFF;font-size:15px;font-weight:600;border:none;">查看完整分析报告</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
