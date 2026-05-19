@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildApiHeaders, buildApiUrl } from "@/lib/api-client";
+import type { FrontendCard, FrontendCardSection } from "@/lib/agent-response";
 
 type AppView =
   | "chat"
@@ -13,6 +14,7 @@ type AppView =
   | "child-form"
   | "child-complete"
   | "child-summary"
+  | "demo"
   | "settings";
 
 type QuestionnaireStatus = "not_started" | "link_created" | "completed" | "skipped";
@@ -20,6 +22,8 @@ type QuestionnaireStatus = "not_started" | "link_created" | "completed" | "skipp
 type MessageType =
   | "user"
   | "normal_reply"
+  | "key_question"
+  | "diagnosis_card"
   | "growth_signal_card"
   | "child_understanding_card"
   | "communication_rehearsal_card"
@@ -31,6 +35,7 @@ interface PrototypeMessage {
   content?: string;
   memoryNote?: string;
   memoryDetail?: string;
+  card?: FrontendCard;
   showPrecision?: boolean;
 }
 
@@ -48,6 +53,7 @@ const routeByView: Record<AppView, string> = {
   "child-form": "/child-card/form",
   "child-complete": "/child-card/complete",
   "child-summary": "/child-card/summary",
+  demo: "/demo",
   settings: "/settings",
 };
 
@@ -83,13 +89,17 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-const initialMessages: PrototypeMessage[] = [
+const realInitialMessages: PrototypeMessage[] = [
   {
     id: "m_welcome",
     type: "normal_reply",
     content:
       "可以从孩子最近的一件小事说起。\n开心的、别扭的、说不清的都可以。\n我会陪你慢慢把孩子的状态和相处节奏看清楚。",
   },
+];
+
+const demoMessages: PrototypeMessage[] = [
+  ...realInitialMessages,
   {
     id: "m_user_1",
     type: "user",
@@ -208,9 +218,42 @@ function cn(type: string, active?: boolean) {
   return active ? `${type} active` : type;
 }
 
+function getCardKind(card?: FrontendCard): MessageType {
+  const rawType = String(card?.card_type ?? card?.type ?? "").toLowerCase();
+  if (rawType.includes("diagnosis") || rawType.includes("understanding")) return "diagnosis_card";
+  if (rawType.includes("growth")) return "growth_signal_card";
+  if (rawType.includes("rehearsal") || rawType.includes("communication")) return "communication_rehearsal_card";
+  return "normal_reply";
+}
+
+function asText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getCardSections(card: FrontendCard | undefined, fields: Array<[keyof FrontendCard | string, string]>): FrontendCardSection[] {
+  if (!card) return [];
+  if (Array.isArray(card.sections)) {
+    return card.sections
+      .map((section) => ({
+        title: asText(section.title),
+        content: asText(section.content),
+      }))
+      .filter((section) => section.content);
+  }
+  if (card.sections && typeof card.sections === "object") {
+    return Object.entries(card.sections)
+      .map(([title, content]) => ({ title, content: asText(content) }))
+      .filter((section) => section.content);
+  }
+
+  return fields
+    .map(([key, title]) => ({ title, content: asText(card[key]) }))
+    .filter((section) => section.content);
+}
+
 export default function DialogueLab2Prototype({ initialView = "chat" }: PrototypeAppProps) {
   const [view, setView] = useState<AppView>(initialView);
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState(realInitialMessages);
   const [input, setInput] = useState("");
   const [placeholder, setPlaceholder] = useState("从孩子最近的一件小事说起");
   const [toast, setToast] = useState("");
@@ -225,7 +268,6 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hasConfirmedProfile, setHasConfirmedProfile] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [sendDebug, setSendDebug] = useState<string | null>(null);
 
   useEffect(() => {
     setView(initialView);
@@ -306,14 +348,12 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     const requestId = Date.now();
     const setStage = (stage: string, detail?: unknown) => {
       const label = `[chat:${requestId}] ${stage}`;
-      setSendDebug(stage);
       console.log(label, detail ?? "");
     };
 
     setMessages((prev) => [...prev, { id: `user_${Date.now()}`, type: "user", content: text }]);
     setInput("");
     setIsSending(true);
-    setSendDebug("准备发送");
 
     void (async () => {
       let timeoutId: number | undefined;
@@ -345,7 +385,9 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         });
         setStage(`收到响应 ${response.status}`);
         const data = (await response.json()) as {
-          reply?: { message_type?: string; content?: string };
+          reply?: { message_type?: string; content?: string; key_question?: string | null };
+          key_question?: string | null;
+          frontend_cards?: FrontendCard[];
           memory_note?: string | null;
           memory_detail?: string | null;
           memory_write_results?: { promoted_count?: number };
@@ -363,6 +405,25 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           memoryNote: data.memory_note ?? undefined,
           memoryDetail: data.memory_detail ?? undefined,
         });
+        for (const card of data.frontend_cards ?? []) {
+          const cardKind = getCardKind(card);
+          if (cardKind === "normal_reply") continue;
+          insertMessage({
+            id: cardKind,
+            type: cardKind,
+            content: asText(card.content ?? card.title),
+            card,
+            showPrecision: questionnaireStatus !== "completed",
+          });
+        }
+        const keyQuestion = (data.key_question ?? data.reply?.key_question ?? "").trim();
+        if (keyQuestion) {
+          insertMessage({
+            id: "key_question",
+            type: "key_question",
+            content: keyQuestion,
+          });
+        }
         setStage("发送完成");
       } catch (error) {
         const message = error instanceof DOMException && error.name === "AbortError"
@@ -370,7 +431,6 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           : error instanceof Error
             ? error.message
             : "未知错误";
-        setSendDebug(`发送失败：${message}`);
         console.error(`[chat:${requestId}] error`, error);
         insertMessage({
           id: "reply",
@@ -383,7 +443,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         setIsSending(false);
       }
     })();
-  }, [input, insertMessage, showToast]);
+  }, [input, insertMessage, questionnaireStatus, showToast]);
 
   const generateLink = useCallback(() => {
     setGeneratedLink("https://demo.yihe.site/child-card/abc123");
@@ -439,6 +499,16 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     if (view === "child-summary") {
       return <ChildPerspectiveSummary navigate={navigate} />;
     }
+    if (view === "demo") {
+      return (
+        <ProductDemoPage
+          navigate={navigate}
+          copyText={copyText}
+          showToast={showToast}
+          setMiniNote={setMiniNote}
+        />
+      );
+    }
     if (view === "settings") {
       return (
         <SettingsPage
@@ -456,7 +526,6 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
       <ChatPage
         messages={messages}
         isSending={isSending}
-        sendDebug={sendDebug}
         input={input}
         setInput={setInput}
         placeholder={placeholder}
@@ -481,7 +550,6 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     generatedLink,
     input,
     isSending,
-    sendDebug,
     messages,
     navigate,
     placeholder,
@@ -536,7 +604,6 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
 function ChatPage({
   messages,
   isSending,
-  sendDebug,
   input,
   setInput,
   placeholder,
@@ -554,7 +621,6 @@ function ChatPage({
 }: {
   messages: PrototypeMessage[];
   isSending: boolean;
-  sendDebug: string | null;
   input: string;
   setInput: (value: string) => void;
   placeholder: string;
@@ -599,15 +665,15 @@ function ChatPage({
         ))}
         {isSending && (
           <div className="dl2-message ai">
-            <div className="dl2-ai-bubble">
-              <TextBlock text="正在发送..." />
+            <div className="dl2-ai-bubble dl2-thinking">
+              <span>模型正在思考中哦</span>
+              <i />
+              <i />
+              <i />
             </div>
           </div>
         )}
       </main>
-      {process.env.NODE_ENV !== "production" && sendDebug && (
-        <div className="dl2-debug-line" aria-live="polite">调试：{sendDebug}</div>
-      )}
       <ChatInput
         value={input}
         setValue={setInput}
@@ -615,6 +681,7 @@ function ChatPage({
         setPlaceholder={setPlaceholder}
         openActionSheet={openActionSheet}
         onSend={sendMock}
+        isSending={isSending}
         showToast={showToast}
       />
     </div>
@@ -649,6 +716,7 @@ function ChatInput({
   setPlaceholder,
   openActionSheet,
   onSend,
+  isSending,
   showToast,
 }: {
   value: string;
@@ -657,6 +725,7 @@ function ChatInput({
   setPlaceholder: (value: string) => void;
   openActionSheet: () => void;
   onSend: (overrideText?: string) => void;
+  isSending: boolean;
   showToast: (text: string) => void;
 }) {
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
@@ -792,13 +861,14 @@ function ChatInput({
   }, [clearPressTimer, finishVoice]);
 
   const handleSend = useCallback(() => {
+    if (isSending) return;
     const text = value.trim();
     if (!text) {
       showToast("先输入一点内容");
       return;
     }
     onSend(text);
-  }, [onSend, showToast, value]);
+  }, [isSending, onSend, showToast, value]);
 
   const handleTextKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -859,7 +929,7 @@ function ChatInput({
       >
         {inputMode === "text" ? <MicIcon /> : <KeyboardIcon />}
       </button>
-      <button className={cn("dl2-send-btn", Boolean(value.trim()))} type="button" onClick={handleSend} aria-label="发送">↑</button>
+      <button className={cn("dl2-send-btn", Boolean(value.trim()) && !isSending)} type="button" onClick={handleSend} disabled={isSending || !value.trim()} aria-label="发送">↑</button>
     </footer>
   );
 }
@@ -876,6 +946,8 @@ function MessageRenderer(props: {
 }) {
   const { message } = props;
   if (message.type === "user") return <div className="dl2-message user"><div className="dl2-user-bubble">{message.content}</div></div>;
+  if (message.type === "key_question") return <KeyQuestionMessage {...props} />;
+  if (message.type === "diagnosis_card") return <DiagnosisCard {...props} />;
   if (message.type === "growth_signal_card") return <GrowthSignalCard {...props} />;
   if (message.type === "child_understanding_card") return <ChildUnderstandingCard {...props} />;
   if (message.type === "communication_rehearsal_card") return <RehearsalCard {...props} />;
@@ -891,6 +963,21 @@ function MessageRenderer(props: {
           {message.memoryNote}
         </button>
       )}
+    </div>
+  );
+}
+
+function KeyQuestionMessage({ message, copyText }: Parameters<typeof MessageRenderer>[0]) {
+  const text = message.content ?? "";
+  return (
+    <div className="dl2-message ai">
+      <article className="dl2-key-question">
+        <div className="dl2-capsule">关键追问</div>
+        <p>{text}</p>
+        <div className="dl2-card-actions quiet">
+          <button type="button" onClick={() => copyText(text, "已复制关键追问")}>复制</button>
+        </div>
+      </article>
     </div>
   );
 }
@@ -945,7 +1032,72 @@ function CardActions({ labels, showToast, openFeedback }: { labels: string[]; sh
   );
 }
 
-function GrowthSignalCard({ showPrecision, openChildCard, showToast, openFeedback }: Parameters<typeof MessageRenderer>[0]) {
+function cardActionLabels(card: FrontendCard | undefined, fallback: string[]) {
+  const labels = Array.isArray(card?.actions) ? card.actions.map((action) => action.label).filter(Boolean) : [];
+  return labels.length ? labels : fallback;
+}
+
+function RenderCardSections({ sections }: { sections: FrontendCardSection[] }) {
+  return (
+    <>
+      {sections.map((section, index) => (
+        <CardSection title={section.title || `要点 ${index + 1}`} key={`${section.title}_${index}`}>
+          {section.content}
+        </CardSection>
+      ))}
+    </>
+  );
+}
+
+function DiagnosisCard({ message, showPrecision, openChildCard, showToast, openFeedback }: Parameters<typeof MessageRenderer>[0]) {
+  const card = message.card;
+  const sections = getCardSections(card, [
+    ["blindSpot", "家长盲点"],
+    ["coreMechanism", "核心机制"],
+    ["behaviorProtection", "行为保护"],
+    ["evidenceBasis", "判断依据"],
+    ["riskWarning", "风险提示"],
+    ["suggestions", "改善建议"],
+  ]);
+
+  return (
+    <div className="dl2-message ai">
+      <article className="dl2-card featured">
+        <CardHeader title={asText(card?.title) || "孩子理解卡"} subtitle={asText(card?.subtitle) || "基于目前聊到的信息整理，后面可以继续调整"} mark="诊" />
+        {sections.length ? (
+          <RenderCardSections sections={sections} />
+        ) : (
+          <CardSection title="当前理解">{message.content || "我先把这次判断整理成一张理解卡，后面可以继续校准。"}</CardSection>
+        )}
+        <CardActions labels={cardActionLabels(card, ["有点像我家孩子", "有些地方不像", "我补充一点", "保存到小档案"])} showToast={showToast} openFeedback={openFeedback} />
+      </article>
+      {showPrecision && <PrecisionWarning onAction={openChildCard} />}
+    </div>
+  );
+}
+
+function GrowthSignalCard({ message, showPrecision, openChildCard, showToast, openFeedback }: Parameters<typeof MessageRenderer>[0]) {
+  const card = message.card;
+  const sections = getCardSections(card, [
+    ["change", "这次记录到的变化"],
+    ["meaning", "可能说明什么"],
+    ["observation", "值得继续观察的点"],
+    ["next_step", "可以轻轻做的一步"],
+  ]);
+
+  if (card && sections.length) {
+    return (
+      <div className="dl2-message ai">
+        <article className="dl2-card">
+          <CardHeader title={asText(card.title) || "这次记录到的信号"} subtitle={asText(card.subtitle) || "基于这次描述整理，后面可以继续调整"} mark="记" />
+          <RenderCardSections sections={sections} />
+          <CardActions labels={cardActionLabels(card, ["有点像", "不太像", "补充一点", "存到小档案"])} showToast={showToast} openFeedback={openFeedback} />
+        </article>
+        {showPrecision && <PrecisionWarning onAction={openChildCard} />}
+      </div>
+    );
+  }
+
   return (
     <div className="dl2-message ai">
       <article className="dl2-card">
@@ -978,9 +1130,36 @@ function ChildUnderstandingCard({ showPrecision, openChildCard, showToast, openF
   );
 }
 
-function RehearsalCard({ showPrecision, openChildCard, copyText, showToast }: Parameters<typeof MessageRenderer>[0]) {
-  const script =
-    "我不是想一下子把手机全收掉，我想先和你确认一件事：你每天真正能休息的时间应该怎么安排，手机也在里面，但不能把睡觉和第二天状态拖垮。我们先试一个你也能接受的版本。";
+function RehearsalCard({ message, showPrecision, openChildCard, copyText, showToast }: Parameters<typeof MessageRenderer>[0]) {
+  const card = message.card;
+  const sections = getCardSections(card, [
+    ["child_reaction", "孩子可能怎么接"],
+    ["stuck_point", "这句话哪里容易卡住"],
+    ["avoid", "需要避免的一点"],
+  ]);
+  const script = asText(card?.script) || "我不是想一下子把手机全收掉，我想先和你确认一件事：你每天真正能休息的时间应该怎么安排，手机也在里面，但不能把睡觉和第二天状态拖垮。我们先试一个你也能接受的版本。";
+
+  if (card && sections.length) {
+    return (
+      <div className="dl2-message ai">
+        <article className="dl2-card">
+          <CardHeader title={asText(card.title) || "先帮你过一遍"} subtitle={asText(card.subtitle) || "把准备说的话先放在孩子视角里看一看"} mark="预" />
+          <RenderCardSections sections={sections.slice(0, 2)} />
+          <div className="dl2-script-box">
+            <div className="dl2-script-head">
+              <span>更稳一点的说法</span>
+              <button type="button" onClick={() => copyText(script, "已复制这段话")}>复制</button>
+            </div>
+            <p>{script}</p>
+          </div>
+          <RenderCardSections sections={sections.slice(2)} />
+          <CardActions labels={cardActionLabels(card, ["有点像", "不太像", "补充一点", "存到小档案"])} showToast={showToast} openFeedback={() => showToast("可以补充孩子的反应")} />
+        </article>
+        {showPrecision && <PrecisionWarning onAction={openChildCard} />}
+      </div>
+    );
+  }
+
   return (
     <div className="dl2-message ai">
       <article className="dl2-card">
@@ -1342,6 +1521,13 @@ function SettingsPage({
           <div className="dl2-reminder-preview">上次说到孩子对“完成后能不能真的休息”比较敏感。这两天如果有类似情况，可以回来简单记一句。</div>
         </section>
         <section className="dl2-settings-card">
+          <h2>产品演示</h2>
+          <p>这里单独保留一组预设对话，用来查看卡片和小档案效果。</p>
+          <div className="dl2-page-actions stacked">
+            <button type="button" onClick={() => navigate("demo")}>查看预设演示</button>
+          </div>
+        </section>
+        <section className="dl2-settings-card">
           <h2>数据与隐私</h2>
           {["导出我的对话", "导出孩子小档案", "删除单条记录", "清空孩子小档案", "关闭孩子小卡链接", "删除全部家庭数据"].map((item) => (
             <button className="dl2-privacy-btn" type="button" key={item} onClick={item.includes("删除") || item.includes("清空") ? openConfirm : () => showToast("已处理")}>
@@ -1349,6 +1535,43 @@ function SettingsPage({
             </button>
           ))}
         </section>
+      </main>
+    </div>
+  );
+}
+
+function ProductDemoPage({
+  navigate,
+  copyText,
+  showToast,
+  setMiniNote,
+}: {
+  navigate: (view: AppView) => void;
+  copyText: (text: string, toastText?: string) => void;
+  showToast: (text: string) => void;
+  setMiniNote: (detail: string) => void;
+}) {
+  return (
+    <div className="dl2-phone">
+      <TopBar title="产品演示" subtitle="预设样例只用于查看展示效果，不进入真实对话。" navigate={navigate} backTo="settings" />
+      <main className="dl2-chat-scroll">
+        <div className="dl2-demo-note">演示内容</div>
+        {demoMessages.map((message) => (
+          <MessageRenderer
+            key={message.id}
+            message={message}
+            showPrecision={Boolean(message.showPrecision)}
+            openMessageMenu={() => showToast("演示内容不会写入真实记录")}
+            openFeedback={() => showToast("演示内容不会写入真实记录")}
+            openChildCard={() => navigate("child-card")}
+            copyText={copyText}
+            showToast={showToast}
+            setMiniNote={setMiniNote}
+          />
+        ))}
+        <div className="dl2-page-actions stacked">
+          <button type="button" onClick={() => navigate("chat")}>回到真实对话</button>
+        </div>
       </main>
     </div>
   );

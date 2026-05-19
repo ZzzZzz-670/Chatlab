@@ -214,24 +214,20 @@
     display: none;
   }
 
-  .dl2-debug-line {
-    position: fixed;
-    left: 50%;
-    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
-    z-index: 39;
-    width: min(430px, 100vw);
-    padding: 5px 14px;
-    border-top: 1px solid #E5EAF2;
-    background: rgba(255,255,255,0.9);
-    color: #526070;
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
   .dl2-message {
     margin-bottom: 16px;
     animation: msgIn 0.22s ease both;
+  }
+
+  .dl2-demo-note {
+    width: fit-content;
+    margin: 0 auto 14px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #EEF4FF;
+    color: #3B63D9;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .dl2-message.user {
@@ -273,6 +269,37 @@
 
   .dl2-ai-bubble.correction {
     background: #FFFFFF;
+  }
+
+  .dl2-thinking {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 14px;
+    color: #526070;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .dl2-thinking i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #8FA2BF;
+    animation: dl2-thinking 900ms ease-in-out infinite;
+  }
+
+  .dl2-thinking i:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .dl2-thinking i:nth-child(4) {
+    animation-delay: 240ms;
+  }
+
+  @keyframes dl2-thinking {
+    0%, 100% { opacity: 0.35; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-2px); }
   }
 
   .dl2-text-block {
@@ -344,6 +371,23 @@
     padding: 16px;
     border-radius: 22px;
     position: relative;
+  }
+
+  .dl2-key-question {
+    width: fit-content;
+    max-width: 88%;
+    border: 1px solid #DCE7FF;
+    border-radius: 16px;
+    background: #F8FBFF;
+    padding: 14px 15px 12px;
+    box-shadow: 0 10px 24px rgba(73,110,210,0.08);
+  }
+
+  .dl2-key-question p {
+    margin: 8px 0 0;
+    color: #2F3A4A;
+    font-size: 15px;
+    line-height: 1.65;
   }
 
   .dl2-card::before {
@@ -691,6 +735,11 @@
 
   .dl2-send-btn.active {
     background: #2F6BFF;
+  }
+
+  .dl2-send-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
   }
 
   .dl2-sheet-mask {

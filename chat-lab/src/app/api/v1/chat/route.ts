@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { judgeMemoryCandidates, routeAgent, type MemoryCandidate } from "@/lib/agent-router";
+import { normalizeAgentOutput, normalizeFrontendCards, normalizeKeyQuestion, type AgentOutput, type FrontendCard } from "@/lib/agent-response";
 import { buildCozeHeaders, fetchCozeWithColdStartRetry } from "@/lib/coze-server";
 import { loadMemoryContext, saveConversationEvent, writeMemoryCandidates } from "@/lib/memory-store";
 
@@ -25,40 +26,6 @@ interface ChatRequest {
   };
 }
 
-interface AgentOutput {
-  reply?: {
-    message_type?: string;
-    content?: string;
-    ui_badge?: string;
-  };
-  actions?: Array<{ label: string; action: string }>;
-  memory_note_suggestion?: { show?: boolean; text?: string; detail?: string };
-  profile_update_candidates?: MemoryCandidate[];
-  growth_record_candidates?: MemoryCandidate[];
-  pending_observation_candidates?: MemoryCandidate[];
-  long_term_goal_updates?: MemoryCandidate[];
-  parent_profile_candidates?: MemoryCandidate[];
-  family_interaction_candidates?: MemoryCandidate[];
-  correction_candidates?: MemoryCandidate[];
-  rehearsal_save_candidate?: MemoryCandidate | null;
-}
-
-function tryJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-    if (fenced) {
-      try {
-        return JSON.parse(fenced);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-}
-
 function extractContentFromCoze(data: unknown): string {
   if (!data || typeof data !== "object") return "";
   const root = data as Record<string, unknown>;
@@ -69,16 +36,22 @@ function extractContentFromCoze(data: unknown): string {
   return typeof content === "string" ? content : "";
 }
 
-function normalizeAgentOutput(rawContent: string): AgentOutput {
-  const parsed = tryJson(rawContent);
-  if (parsed && typeof parsed === "object") return parsed as AgentOutput;
-  return {
-    reply: {
-      message_type: "normal_reply",
-      content: rawContent.trim(),
-    },
-    actions: [],
-  };
+function extractFrontendCardsFromCoze(data: unknown): FrontendCard[] {
+  if (!data || typeof data !== "object") return [];
+  const root = data as Record<string, unknown>;
+  const cards = normalizeFrontendCards(root.frontend_cards ?? root.frontendCards ?? root.cards);
+  const diagnosis = root.diagnosis;
+
+  if (diagnosis && typeof diagnosis === "object") {
+    cards.push({
+      ...(diagnosis as Record<string, unknown>),
+      card_type: "diagnosis_card",
+      title: "孩子理解卡",
+      subtitle: "基于当前诊断结构化整理",
+    });
+  }
+
+  return cards;
 }
 
 function mapAgentCandidates(output: AgentOutput): MemoryCandidate[] {
@@ -112,6 +85,9 @@ function fallbackReply(text: string, agent: string) {
       message_type: rehearsal ? "communication_rehearsal" : "normal_reply",
       content,
     },
+    key_question: rehearsal
+      ? "如果先不谈时长，孩子最在意的是休息被压缩，还是手机被拿走？"
+      : "这种情况更常出现在开始前，还是已经做了一段以后？",
     actions: rehearsal
       ? [
           { label: "复制", action: "copy" },
@@ -119,6 +95,44 @@ function fallbackReply(text: string, agent: string) {
           { label: "进一步解释", action: "further_explanation" },
         ]
       : [],
+    frontend_cards: rehearsal
+      ? [
+          {
+            card_type: "communication_rehearsal",
+            title: "先帮你过一遍",
+            subtitle: "把准备说的话先放在孩子视角里看一看",
+            sections: [
+              {
+                title: "孩子可能怎么接",
+                content: "如果他最近比较在意完成后能不能真的休息，他可能先感到休息时间又被压缩了。",
+              },
+              {
+                title: "需要避免的一点",
+                content: "不要把开头放在“你就是自控力差”上，先确认他真正担心的是什么。",
+              },
+            ],
+            script: "我不是想一下子把手机全收掉，我想先和你确认一件事：你每天真正能休息的时间应该怎么安排，手机也在里面，但不能把睡觉和第二天状态拖垮。",
+          },
+        ]
+      : /主动|变化|进步|自己/.test(text)
+        ? [
+            {
+              card_type: "growth_signal",
+              title: "这次记录到的信号",
+              subtitle: "基于这次描述整理，后面可以继续调整",
+              sections: [
+                {
+                  title: "这次记录到的变化",
+                  content: "孩子出现过自己往前走一步的行为，这比单看结果更值得先记下来。",
+                },
+                {
+                  title: "值得继续观察的点",
+                  content: "接下来可以看，这种主动更容易出现在压力低、边界清楚的时候，还是需要某种提醒才能出现。",
+                },
+              ],
+            },
+          ]
+        : [],
   } satisfies AgentOutput;
 }
 
@@ -137,7 +151,12 @@ async function callCozeAgent(payload: unknown, signal: AbortSignal): Promise<Age
 
     if (!upstream.ok) return null;
     const data = (await upstream.json()) as unknown;
-    return normalizeAgentOutput(extractContentFromCoze(data));
+    const output = normalizeAgentOutput(extractContentFromCoze(data));
+    output.frontend_cards = [
+      ...normalizeFrontendCards(output.frontend_cards),
+      ...extractFrontendCardsFromCoze(data),
+    ];
+    return output;
   } catch {
     return null;
   } finally {
@@ -213,6 +232,7 @@ export async function POST(request: NextRequest) {
   ]);
 
   const reply: NonNullable<AgentOutput["reply"]> = agentOutput.reply ?? { message_type: "normal_reply", content: "" };
+  const keyQuestion = normalizeKeyQuestion(agentOutput.key_question ?? agentOutput.keyQuestion ?? reply.key_question);
   const messageId = `msg_${Date.now()}`;
 
   await saveConversationEvent({
@@ -234,6 +254,8 @@ export async function POST(request: NextRequest) {
       ui_badge: reply.ui_badge ?? (memoryContext.hasConfirmedProfile ? "已参考孩子小档案" : undefined),
       content: reply.content ?? "",
     },
+    key_question: keyQuestion ?? null,
+    frontend_cards: normalizeFrontendCards(agentOutput.frontend_cards),
     actions: agentOutput.actions ?? [],
     memory_note: writeResult.memory_note,
     memory_detail: writeResult.memory_detail,
