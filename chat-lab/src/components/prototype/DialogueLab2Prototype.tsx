@@ -272,6 +272,9 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
   const [isSending, setIsSending] = useState(false);
   const [showQhbStatus, setShowQhbStatus] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [backendTarget, setBackendTarget] = useState<"diagnosis" | "daily_talk">("diagnosis");
+  const [familyId, setFamilyId] = useState("family_demo");
+  const [childId, setChildId] = useState("child_demo");
 
   useEffect(() => {
     setView(initialView);
@@ -344,6 +347,29 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
     if (action === "profile") navigate("profile");
   }, [insertMessage, navigate, questionnaireStatus, showToast]);
 
+  const handleNewChat = () => {
+    console.log("[handleNewChat] starting new chat");
+    const newFamilyId = `family_${Date.now()}`;
+    const newChildId = `child_${Date.now()}`;
+    setFamilyId(newFamilyId);
+    setChildId(newChildId);
+    setMessages([...realInitialMessages]);
+    setInput("");
+    setPlaceholder("从孩子最近的一件小事说起");
+    setHasConfirmedProfile(false);
+    setBackendTarget("diagnosis");
+    setQuestionnaireStatus("not_started");
+    setAnswers({});
+    setQuestionIndex(0);
+    setGeneratedLink("");
+    setSheet(null);
+    setMiniNote(null);
+    setShowOnboarding(false);
+    navigate("chat");
+    showToast("已开启新对话");
+    console.log("[handleNewChat] done, messages should be reset");
+  };
+
   const sendMock = useCallback((overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text) {
@@ -369,9 +395,9 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           headers: buildApiHeaders(),
           cache: "no-store",
           body: JSON.stringify({
-            family_id: "family_demo",
-            child_id: "child_demo",
-            conversation_id: "conv_demo",
+            family_id: familyId,
+            child_id: childId,
+            conversation_id: `conv_${familyId}_${childId}`,
             message: {
               text,
               attachments: [],
@@ -382,6 +408,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
               page: "chat",
               communication_prefs: selectedPrefs,
               questionnaire_status: questionnaireStatus,
+              backend_target: backendTarget,
             },
           }),
         });
@@ -561,6 +588,7 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         // 检查 diagnosis_completed 标记
         if (agentMeta?.diagnosis_completed === true) {
           setHasConfirmedProfile(true);
+          setBackendTarget("daily_talk");
         }
 
         setStage("流读取完成", { textLength: cleanedText.length, hasMeta: !!agentMeta });
@@ -654,6 +682,8 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           reminderEnabled={reminderEnabled}
           setReminderEnabled={setReminderEnabled}
           openConfirm={() => setSheet("confirm")}
+          backendTarget={backendTarget}
+          setBackendTarget={setBackendTarget}
         />
       );
     }
@@ -678,14 +708,18 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
         sendMock={sendMock}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
+        onNewChat={handleNewChat}
       />
     );
   }, [
     answers,
+    backendTarget,
     copyText,
+    familyId,
     finishQuestionnaire,
     generateLink,
     generatedLink,
+    handleNewChat,
     input,
     isSending,
     messages,
@@ -762,6 +796,7 @@ function ChatPage({
   sendMock,
   sidebarOpen,
   setSidebarOpen,
+  onNewChat,
 }: {
   messages: PrototypeMessage[];
   isSending: boolean;
@@ -782,7 +817,9 @@ function ChatPage({
   sendMock: (overrideText?: string) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (value: boolean) => void;
+  onNewChat: () => void;
 }) {
+  console.log("[ChatPage] render, messages.length:", messages.length, "firstId:", messages[0]?.id);
   const scrollRef = useRef<HTMLElement | null>(null);
   const [qhbCount, setQhbCount] = useState(1);
 
@@ -808,12 +845,14 @@ function ChatPage({
   return (
     <div className="dl2-phone">
       <TopBar title="对话实验室" subtitle="记录孩子的变化，慢慢看懂孩子。" navigate={navigate} onOpenSidebar={() => setSidebarOpen(true)} />
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNavigate={(v) => navigate(v as AppView)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNavigate={(v) => navigate(v as AppView)} onNewChat={onNewChat} />
       <main className="dl2-chat-scroll" ref={scrollRef}>
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <MessageRenderer
             key={message.id}
             message={message}
+            isLastMessage={index === messages.length - 1}
+            isSending={isSending}
             showPrecision={questionnaireStatus !== "completed" && Boolean(message.showPrecision)}
             openMessageMenu={openMessageMenu}
             openFeedback={openFeedback}
@@ -823,18 +862,6 @@ function ChatPage({
             setMiniNote={setMiniNote}
           />
         ))}
-        {isSending && (
-          messages[messages.length - 1]?.type === "user" ||
-          (messages[messages.length - 1]?.type === "normal_reply" && !messages[messages.length - 1]?.content)
-        ) && (
-          <div className="dl2-message ai">
-            <div className="dl2-ai-bubble dl2-thinking">
-              <i />
-              <i />
-              <i />
-            </div>
-          </div>
-        )}
         {showQhbStatus && (
           <div className="qhb-status-bottom">
             <span className="qhb-status-icon">🔍</span>
@@ -1104,6 +1131,8 @@ function ChatInput({
 
 function MessageRenderer(props: {
   message: PrototypeMessage;
+  isLastMessage?: boolean;
+  isSending?: boolean;
   showPrecision: boolean;
   openMessageMenu: () => void;
   openFeedback: () => void;
@@ -1120,11 +1149,22 @@ function MessageRenderer(props: {
   if (message.type === "child_understanding_card") return <ChildUnderstandingCard {...props} />;
   if (message.type === "communication_rehearsal_card") return <RehearsalCard {...props} />;
   if (message.type === "correction_reply") return <CorrectionMessage {...props} />;
+  const isLoadingBubble = message.type === "normal_reply" && !message.content && props.isLastMessage && props.isSending;
   return (
     <div className="dl2-message ai">
       <div className="dl2-ai-bubble">
-        <TextBlock text={message.content ?? ""} />
-        <MessageTools text={message.content ?? ""} copyText={props.copyText} openMenu={props.openMessageMenu} />
+        {isLoadingBubble ? (
+          <div className="dl2-thinking">
+            <i />
+            <i />
+            <i />
+          </div>
+        ) : (
+          <TextBlock text={message.content ?? ""} />
+        )}
+        {!isLoadingBubble && (
+          <MessageTools text={message.content ?? ""} copyText={props.copyText} openMenu={props.openMessageMenu} />
+        )}
       </div>
       {message.memoryNote && (
         <button className="dl2-memory-note" type="button" onClick={() => props.setMiniNote(message.memoryDetail ?? message.memoryNote ?? "")}>
@@ -1652,6 +1692,8 @@ function SettingsPage({
   reminderEnabled,
   setReminderEnabled,
   openConfirm,
+  backendTarget,
+  setBackendTarget,
 }: {
   navigate: (view: AppView) => void;
   showToast: (text: string) => void;
@@ -1660,12 +1702,40 @@ function SettingsPage({
   reminderEnabled: boolean;
   setReminderEnabled: (value: boolean) => void;
   openConfirm: () => void;
+  backendTarget: "diagnosis" | "daily_talk";
+  setBackendTarget: (value: "diagnosis" | "daily_talk") => void;
 }) {
   const prefs = ["简洁一点", "多解释一点", "建议具体一点", "先判断，少安慰", "温和一点", "可以指出盲点"];
+  const backendOptions: Array<{ key: "diagnosis" | "daily_talk"; label: string; desc: string }> = [
+    { key: "diagnosis", label: "诊断 Agent", desc: "适合深度分析、排查问题、学情诊断" },
+    { key: "daily_talk", label: "日常对话 Agent", desc: "适合轻松交流、闲聊、沟通预演" },
+  ];
   return (
     <div className="dl2-phone">
       <TopBar title="设置" subtitle="把系统调整成更适合你的陪伴方式。" navigate={navigate} backTo="chat" />
       <main className="dl2-page-scroll">
+        <section className="dl2-settings-card">
+          <h2>后端 Agent 选择</h2>
+          <p>切换当前对话使用的后端服务，默认走诊断 Agent。</p>
+          <div className="dl2-chip-grid">
+            {backendOptions.map((opt) => (
+              <button
+                key={opt.key}
+                className={cn("dl2-chip", backendTarget === opt.key)}
+                type="button"
+                onClick={() => {
+                  setBackendTarget(opt.key);
+                  showToast(`已切换到 ${opt.label}`);
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="dl2-style-preview">
+            当前后端：{backendOptions.find((o) => o.key === backendTarget)?.label} — {backendOptions.find((o) => o.key === backendTarget)?.desc}
+          </div>
+        </section>
         <section className="dl2-settings-card">
           <h2>我的沟通偏好</h2>
           <p>你可以调整我和你说话的方式。</p>

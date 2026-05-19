@@ -7,9 +7,11 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (view: string) => void;
+  onNewChat?: () => void;
 }
 
 const menuItems = [
+  { icon: "💬", text: "开启新对话", action: "new_chat" },
   { icon: "🏫", text: "清北社区", href: "/community" },
   { icon: "🎯", text: "名校直答", href: "/qa" },
   { icon: "👶", text: "孩子人物", href: "/character" },
@@ -19,7 +21,7 @@ const menuItems = [
   { icon: "🎬", text: "产品演示", action: "demo" },
 ];
 
-export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onNavigate, onNewChat }: SidebarProps) {
   return (
     <>
       <div className={`sidebar-overlay ${isOpen ? "active" : ""}`} onClick={onClose} />
@@ -36,7 +38,11 @@ export default function Sidebar({ isOpen, onClose, onNavigate }: SidebarProps) {
                 className="menu-item"
                 type="button"
                 onClick={() => {
-                  onNavigate?.(item.action!);
+                  if (item.action === "new_chat") {
+                    onNewChat?.();
+                  } else {
+                    onNavigate?.(item.action!);
+                  }
                   onClose();
                 }}
               >

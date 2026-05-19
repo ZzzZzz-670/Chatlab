@@ -4,6 +4,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DIAGNOSIS_BACKEND_URL = process.env.DIAGNOSIS_BACKEND_URL?.replace(/\/+$/, "") ?? "http://localhost:8000";
+const DAILY_TALK_BACKEND_URL = process.env.DAILY_TALK_BACKEND_URL?.replace(/\/+$/, "") ?? "http://localhost:8001";
+
+const BACKEND_MAP: Record<string, string> = {
+  diagnosis: DIAGNOSIS_BACKEND_URL,
+  daily_talk: DAILY_TALK_BACKEND_URL,
+};
 
 interface ChatRequest {
   family_id?: string;
@@ -19,6 +25,7 @@ interface ChatRequest {
     entry_mode?: string;
     communication_prefs?: string[];
     questionnaire_status?: string;
+    backend_target?: string;
   };
 }
 
@@ -35,6 +42,8 @@ export async function POST(request: NextRequest) {
 
   const familyId = payload.family_id || "family_demo";
   const childId = payload.child_id || "child_demo";
+  const backendTarget = payload.client_context?.backend_target ?? "diagnosis";
+  const targetUrl = BACKEND_MAP[backendTarget] ?? DIAGNOSIS_BACKEND_URL;
 
   const upstreamPayload = {
     family_id: familyId,
@@ -50,11 +59,12 @@ export async function POST(request: NextRequest) {
       entry_mode: payload.client_context?.entry_mode ?? "daily_chat",
       communication_prefs: payload.client_context?.communication_prefs ?? [],
       questionnaire_status: payload.client_context?.questionnaire_status ?? "not_started",
+      backend_target: backendTarget,
     },
   };
 
   try {
-    const upstream = await fetch(`${DIAGNOSIS_BACKEND_URL}/stream_run`, {
+    const upstream = await fetch(`${targetUrl}/stream_run`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
       body: JSON.stringify(upstreamPayload),

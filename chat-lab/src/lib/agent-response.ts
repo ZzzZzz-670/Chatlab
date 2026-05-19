@@ -129,18 +129,30 @@ export function highlightQuestion(text: string): string {
   if (lastQuestionMark === -1) return text;
 
   // 从最后一个问号往前，找最靠后的提问开头词
-  let startIndex = -1;
+  let keywordIndex = -1;
   for (const prefix of questionPrefixes) {
     const idx = text.lastIndexOf(prefix, lastQuestionMark);
-    if (idx !== -1 && idx > startIndex) {
-      startIndex = idx;
+    if (idx !== -1 && idx > keywordIndex) {
+      keywordIndex = idx;
     }
   }
 
-  // 没找到提问开头词时，找最后一个问号之前的句子边界
-  if (startIndex === -1) {
+  // 确定高亮起始位置：如果找到了关键词，往前找句子边界；否则从句子边界开始
+  let startIndex: number;
+  if (keywordIndex !== -1) {
+    // 从关键词位置往前找句子边界
+    const beforeKeyword = text.slice(0, keywordIndex);
+    const enders = /[。！；.!;\n]/g;
+    let lastEnder = -1;
+    let match;
+    while ((match = enders.exec(beforeKeyword)) !== null) {
+      lastEnder = match.index;
+    }
+    startIndex = lastEnder !== -1 ? lastEnder + 1 : 0;
+  } else {
+    // 没找到提问开头词时，找最后一个问号之前的句子边界
     const beforeQuestion = text.slice(0, lastQuestionMark);
-    const enders = /[。！；.!;]/g;
+    const enders = /[。！；.!;\n]/g;
     let lastEnder = -1;
     let match;
     while ((match = enders.exec(beforeQuestion)) !== null) {

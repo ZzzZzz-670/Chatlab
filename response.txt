@@ -1,4 +1,1 @@
-您别太焦虑啦，不想写作业背后其实有很多具体原因，咱们先搞清楚细节才好对应调整。我想问您一下：他是所有科目的作业都不愿意碰，还是只有某一类任务比如作文、背诵、订正的时候抵触特别明显呀？
-<AGENT_META>
-{"output_type": "key_question", "key_question_content": "他是所有科目的作业都不愿意碰，还是只有某一类任务比如作文、背诵、订正的时候抵触特别明显？", "diagnosis_completed": false, "diagnosis_card": null, "handoff_summary": null, "profile_update_candidates": [], "pending_observations": []}
-</AGENT_META>
+我先不把它直接定成不想学或者不自觉。这里更需要区分一个细节：他是坐下前一直拖着不开始，还是写了一段之后才慢下来？
