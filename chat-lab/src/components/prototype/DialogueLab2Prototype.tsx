@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildApiHeaders, buildApiUrl } from "@/lib/api-client";
+import { cleanVisibleText } from "@/lib/agent-response";
 import type { FrontendCard, FrontendCardSection } from "@/lib/agent-response";
 
 type AppView =
@@ -470,12 +471,56 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           }
         }
 
-        // 最终更新一次完整文本
+        // 清理文本中的内部标记和 markdown 噪声
+        const cleanedText = cleanVisibleText(accumulatedText);
+
+        // 提取 markdown 诊断块（**字段名**：内容）
+        const diagFields = [
+          "家长盲点", "核心机制", "行为保护", "可能含义",
+          "判断依据", "风险提示", "建议回复", "改善建议",
+          "可解释的三个行为", "预测验证", "边界与轻验证",
+        ];
+        const diagSections: FrontendCardSection[] = [];
+        let displayText = cleanedText;
+
+        // 过滤 DIAGNOSIS_JSON 和 DIAGNOSIS_READY（如果 cleanVisibleText 没滤干净）
+        displayText = displayText.replace(/<!--DIAGNOSIS_JSON[\s\S]*?-->/g, "");
+        displayText = displayText.replace(/###DIAGNOSIS_READY###/g, "");
+
+        for (const field of diagFields) {
+          const pattern = new RegExp(
+            `\\*\\*\\s*${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\*\\*[:：]\\s*([\\s\\S]*?)(?=\\n\\s*\\*\\*|$)`,
+            "i"
+          );
+          const match = displayText.match(pattern);
+          if (match) {
+            diagSections.push({ title: field, content: match[1].trim() });
+            displayText = displayText.replace(match[0], "");
+          }
+        }
+
+        // 如果提取到诊断字段，插入诊断卡片
+        if (diagSections.length > 0) {
+          insertMessage({
+            id: "diagnosis_card",
+            type: "diagnosis_card",
+            content: "孩子理解卡",
+            card: {
+              card_type: "diagnosis_card",
+              title: "孩子理解卡",
+              subtitle: "基于当前诊断结构化整理",
+              sections: diagSections,
+            },
+            showPrecision: questionnaireStatus !== "completed",
+          });
+        }
+
+        // 最终更新一次完整文本（已移除诊断块）
         setMessages((prev) => {
           const idx = prev.findIndex((m) => m.id === aiMessageId);
           if (idx >= 0) {
             const updated = [...prev];
-            updated[idx] = { ...updated[idx], content: accumulatedText };
+            updated[idx] = { ...updated[idx], content: displayText };
             return updated;
           }
           return prev;
@@ -493,12 +538,31 @@ export default function DialogueLab2Prototype({ initialView = "chat" }: Prototyp
           });
         }
 
+        // 从 agent_meta 中提取诊断卡 / 前端卡片
+        const metaCards = agentMeta?.frontend_cards ?? agentMeta?.frontendCards ?? agentMeta?.cards ?? agentMeta?.diagnosis_card;
+        if (metaCards) {
+          const cardList = Array.isArray(metaCards) ? metaCards : [metaCards];
+          for (const rawCard of cardList) {
+            if (!rawCard || typeof rawCard !== "object") continue;
+            const card = rawCard as FrontendCard;
+            const cardKind = getCardKind(card);
+            if (cardKind === "normal_reply") continue;
+            insertMessage({
+              id: cardKind,
+              type: cardKind,
+              content: asText(card.content ?? card.title),
+              card,
+              showPrecision: questionnaireStatus !== "completed",
+            });
+          }
+        }
+
         // 检查 diagnosis_completed 标记
         if (agentMeta?.diagnosis_completed === true) {
           setHasConfirmedProfile(true);
         }
 
-        setStage("流读取完成", { textLength: accumulatedText.length, hasMeta: !!agentMeta });
+        setStage("流读取完成", { textLength: cleanedText.length, hasMeta: !!agentMeta });
       } catch (error) {
         const message = error instanceof Error ? error.message : "未知错误";
         console.error(`[chat:${requestId}] error`, error);
@@ -733,6 +797,9 @@ function ChatPage({
           />
         ))}
         {isSending && (
+          messages[messages.length - 1]?.type === "user" ||
+          (messages[messages.length - 1]?.type === "normal_reply" && !messages[messages.length - 1]?.content)
+        ) && (
           <div className="dl2-message ai">
             <div className="dl2-ai-bubble dl2-thinking">
               <span>模型正在思考中哦</span>
@@ -1054,8 +1121,8 @@ function KeyQuestionMessage({ message, copyText }: Parameters<typeof MessageRend
 function TextBlock({ text }: { text: string }) {
   return (
     <div className="dl2-text-block">
-      {text.split("\n").map((line) => (
-        <p key={line}>{line}</p>
+      {text.split("\n").map((line, idx) => (
+        <p key={idx}>{line}</p>
       ))}
     </div>
   );
