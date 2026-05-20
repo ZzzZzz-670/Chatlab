@@ -13,9 +13,14 @@ import os
 import re
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
+# 优先加载 backend/.env（集中配置 ASR 等跨服务变量），再加载本地 .env（可覆盖）
+_backend_env = Path(__file__).resolve().parent.parent / ".env"
+if _backend_env.exists():
+    load_dotenv(dotenv_path=_backend_env)
 load_dotenv()
 
 import requests
@@ -347,7 +352,19 @@ async def stream_run(req: ChatRequest):
     )
 
 
-# ── 本地 ASR（faster-whisper，不依赖外部 API）──
+# ── 统一 ASR 客户端（支持讯飞 / 本地切换）──
+try:
+    import sys
+    _backend_dir = Path(__file__).resolve().parent.parent
+    if str(_backend_dir) not in sys.path:
+        sys.path.insert(0, str(_backend_dir))
+    from asr_client import recognize as asr_recognize
+    ASR_CLIENT_AVAILABLE = True
+except ImportError as _e:
+    ASR_CLIENT_AVAILABLE = False
+    logger.warning("asr_client not available: %s", _e)
+
+# 保留本地 ASR 兜底（兼容旧模式）
 try:
     from local_asr import LocalASR
     LOCAL_ASR_AVAILABLE = True
@@ -357,7 +374,7 @@ except ImportError:
 
 @app.post("/api/asr")
 async def http_asr(request: Request):
-    """语音转文本接口 — 优先本地 faster-whisper。"""
+    """语音转文本接口 — 默认讯飞 ASR，可通过 ASR_PROVIDER 环境变量切换。"""
     payload = await request.json()
     base64_data = payload.get("base64_data") or payload.get("base64Data")
     mime_type = payload.get("mime_type") or payload.get("mimeType")
@@ -365,6 +382,26 @@ async def http_asr(request: Request):
     if not base64_data:
         raise HTTPException(status_code=400, detail="base64_data is required")
 
+    # 1. 优先使用统一客户端（支持讯飞/本地切换）
+    if ASR_CLIENT_AVAILABLE:
+        try:
+            text = await asr_recognize(base64_data=base64_data, mime_type=mime_type)
+            return {"status": "success", "text": text}
+        except Exception as e:
+            logger.error("ASR client failed: %s", e)
+            # 如果 asr_client 用的是本地模式且失败了，直接抛异常；
+            # 如果是讯飞模式失败，可尝试本地 fallback（若本地可用）
+            import asr_client
+            if asr_client.ASR_PROVIDER.lower().strip() == "xunfei" and LOCAL_ASR_AVAILABLE:
+                logger.info("Fallback to local ASR after xunfei failure")
+                try:
+                    text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
+                    return {"status": "success", "text": text}
+                except Exception as e2:
+                    logger.error("Local ASR fallback also failed: %s", e2)
+            raise HTTPException(status_code=500, detail=f"ASR failed: {e}")
+
+    # 2. 兼容旧模式：直接本地 ASR
     if LOCAL_ASR_AVAILABLE:
         try:
             text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
@@ -373,7 +410,7 @@ async def http_asr(request: Request):
             logger.error("Local ASR failed: %s", e)
             raise HTTPException(status_code=500, detail=f"ASR failed: {e}")
 
-    raise HTTPException(status_code=501, detail="Local ASR not available")
+    raise HTTPException(status_code=501, detail="ASR not available")
 
 
 # ── 健康检查 ──

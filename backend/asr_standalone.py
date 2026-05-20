@@ -18,6 +18,10 @@ import tempfile
 import time
 from pathlib import Path
 
+# 加载 backend/.env（集中配置 ASR 等跨服务变量）
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 # 确保能找到 local_asr（兼容从项目根目录或 backend/ 下启动）
 SCRIPT_DIR = Path(__file__).resolve().parent
 for d in (SCRIPT_DIR / "diagnosis", SCRIPT_DIR / "projects/src", SCRIPT_DIR):
@@ -25,7 +29,19 @@ for d in (SCRIPT_DIR / "diagnosis", SCRIPT_DIR / "projects/src", SCRIPT_DIR):
         sys.path.insert(0, str(d))
         break
 
-from local_asr import LocalASR
+# 优先使用统一 ASR 客户端（支持讯飞 / 本地切换）
+try:
+    from asr_client import recognize_sync
+    ASR_CLIENT_AVAILABLE = True
+except ImportError:
+    ASR_CLIENT_AVAILABLE = False
+
+# 本地 ASR（兼容旧模式，也作为 fallback 储备）
+try:
+    from local_asr import LocalASR
+    LOCAL_ASR_AVAILABLE = True
+except ImportError:
+    LOCAL_ASR_AVAILABLE = False
 
 # ── 日志配置 ──
 logging.basicConfig(
@@ -49,10 +65,31 @@ def print_memory_info():
 
 
 def preload_with_detail() -> bool:
-    """加载模型并输出详细过程。"""
+    """加载模型并输出详细过程（仅本地模式需要加载）。"""
     logger.info("=" * 60)
     logger.info("ASR Standalone Service")
     logger.info("=" * 60)
+
+    # 检测当前 provider
+    provider = "local"
+    if ASR_CLIENT_AVAILABLE:
+        import asr_client
+        provider = asr_client.ASR_PROVIDER.lower().strip()
+
+    if provider == "xunfei":
+        logger.info("[ASR] Provider = xunfei (讯飞 ASR)")
+        logger.info("[ASR] 无需预加载本地模型，服务启动中...")
+        logger.info("=" * 60)
+        logger.info("Service READY at http://localhost:%s/api/asr", PORT)
+        logger.info("=" * 60)
+        return True
+
+    # local 模式：加载 faster-whisper
+    if not LOCAL_ASR_AVAILABLE:
+        logger.error("[ASR] Provider = local 但 local_asr 不可用")
+        return False
+
+    logger.info("[ASR] Provider = local (faster-whisper)")
     logger.info("[1/3] 准备加载 faster-whisper 模型...")
     logger.info("      model=%s device=%s compute_type=%s",
                 LocalASR._model_size, LocalASR._device, LocalASR._compute_type)
@@ -80,6 +117,16 @@ def preload_with_detail() -> bool:
     return True
 
 
+def _asr_ready() -> bool:
+    """返回 ASR 是否就绪。"""
+    if ASR_CLIENT_AVAILABLE:
+        import asr_client
+        if asr_client.ASR_PROVIDER.lower().strip() == "local":
+            return LOCAL_ASR_AVAILABLE and LocalASR._model is not None
+        return True  # 讯飞模式不需要预加载本地模型
+    return LOCAL_ASR_AVAILABLE and LocalASR._model is not None
+
+
 def handle_request(environ, start_response):
     """极简 WSGI handler — 只处理 POST /api/asr"""
     path = environ.get("PATH_INFO", "")
@@ -87,7 +134,7 @@ def handle_request(environ, start_response):
 
     if method == "GET" and path == "/health":
         start_response("200 OK", [("Content-Type", "application/json")])
-        return [json.dumps({"status": "ok", "asr_ready": LocalASR._model is not None}).encode()]
+        return [json.dumps({"status": "ok", "asr_ready": _asr_ready()}).encode()]
 
     if method != "POST" or path != "/api/asr":
         start_response("404 Not Found", [("Content-Type", "application/json")])
@@ -105,7 +152,12 @@ def handle_request(environ, start_response):
             return [json.dumps({"error": "base64_data is required"}).encode()]
 
         t0 = time.time()
-        text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
+        if ASR_CLIENT_AVAILABLE:
+            text = recognize_sync(base64_data=base64_data, mime_type=mime_type)
+        elif LOCAL_ASR_AVAILABLE:
+            text = LocalASR.recognize(base64_data=base64_data, mime_type=mime_type)
+        else:
+            raise RuntimeError("ASR not available: neither asr_client nor local_asr is ready")
         t1 = time.time()
 
         logger.info("[recognize] 识别耗时 %.2fs, text='%s'", t1 - t0, text[:50] if text else "(empty)")

@@ -79,3 +79,54 @@
 - 后端语法检查通过：
   - `python.exe -m py_compile backend/projects/src/main.py`
 - `git diff --check` 通过。
+
+
+## 2026-05-20
+
+### TODO：新增讯飞 ASR 统一接口，保留本地 faster-whisper 能力
+- 改动：
+  - 新建 `backend/asr_client.py`，作为统一 ASR 客户端。
+    - 支持 `ASR_PROVIDER` 一键切换：`"xunfei"`（默认）或 `"local"`。
+    - 讯飞实现：基于官方 WebSocket 接口（`wss://iat.xf-yun.com/v1`），完整实现鉴权签名、分帧发送（1280 字节/40ms）、结果解析。
+    - 本地实现：透传 `local_asr.LocalASR.recognize`，完全复用旧逻辑。
+    - 提供 `recognize()`（async，供 FastAPI 用）和 `recognize_sync()`（同步，供 asr_standalone 用）。
+  - 修改 `backend/diagnosis/main.py`、`backend/daily_talk/main.py`：
+    - `/api/asr` 路由优先调用 `asr_client.recognize()`。
+    - 讯飞失败且 `ASR_PROVIDER=xunfei` 时，自动 fallback 到本地 ASR（若可用）。
+    - 若 `asr_client` 未安装/导入失败，完全回退到旧本地 ASR 逻辑，不破坏原有功能。
+  - 修改 `backend/projects/src/main.py`：
+    - `/api/asr` 路由同样优先 `asr_client`。
+    - 保留原有三级 fallback 链：asr_client → local ASR → coze SDK `ASRClient`。
+  - 修改 `backend/asr_standalone.py`：
+    - 接入 `asr_client.recognize_sync()`。
+    - 启动时根据 `ASR_PROVIDER` 决定是否预加载 faster-whisper 模型；讯飞模式下跳过本地加载，直接启动。
+- 验证：
+  - `python -m py_compile` 通过：
+    - `backend/asr_client.py`
+    - `backend/asr_standalone.py`
+    - `backend/diagnosis/main.py`
+    - `backend/daily_talk/main.py`
+    - `backend/projects/src/main.py`
+  - `rg` 确认 `ASR_PROVIDER`、`asr_client`、`XUNFEI_APPID` 等新增关键字在各文件位置正确。
+  - `git diff --check` 通过。
+- 备注：
+  - 所有 `local_asr.py`（diagnosis / daily_talk / projects/src 三份）**完全未修改**，本地 ASR 能力完整保留。
+  - 讯飞模式需额外安装 `websocket-client` 并配置 `XUNFEI_APPID`、`XUNFEI_API_KEY`、`XUNFEI_API_SECRET`。
+
+
+## 2026-05-20
+
+### TODO：确认前端与 projects/talk_agent 解耦，只依赖 daily_talk + diagnosis
+- 调查：
+  - 全局搜索 `chat-lab/src` 内所有后端请求：`/api/v1/chat` → 转发到 diagnosis/daily_talk；`/api/asr` → 转发到 ASR standalone 或 diagnosis。
+  - 零引用 `projects`、`talk_agent`、`project` 关键字。
+  - 前端自身端口 5000 是 Next.js dev server，与 `backend/projects` 服务无关。
+  - `/api/chat`、`/api/tts` 两个路由虽存在，但**无任何前端组件调用**，不影响解耦结论。
+- 结论：
+  - **前端已完全解耦 projects 和 talk_agent**，当前只需启动 `diagnosis:8000` + `daily_talk:8001` + `chat-lab:5000` 即可完整运行。
+  - ASR 可独立启动（8002），也可让 diagnosis:8000 兼任 ASR fallback。
+- 改动：
+  - 更新 `chat-lab/.env.local.example`，补充 `DIAGNOSIS_BACKEND_URL`、`DAILY_TALK_BACKEND_URL`、`ASR_STANDALONE_URL` 示例。
+- 验证：
+  - `rg` 确认前端代码中无 projects/talk_agent 引用。
+  - `git diff --check` 通过。
